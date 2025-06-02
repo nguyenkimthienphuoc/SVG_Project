@@ -12,3 +12,5 @@ public:
     SVGRect(float x, float y, float w, float h, Gdiplus::Color fill, Gdiplus::Color stroke, float strokeW);
     void draw(Gdiplus::Graphics* graphics) override;
 };
+
+//Đây là demo sử dụng git

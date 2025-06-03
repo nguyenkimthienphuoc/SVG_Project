@@ -27,9 +27,6 @@
     <ClInclude Include="SVGDemo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="rapidxml.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SVGCircle.h">
       <Filter>Header Files</Filter>
     </ClInclude>

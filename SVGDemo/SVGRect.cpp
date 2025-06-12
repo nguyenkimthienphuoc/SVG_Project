@@ -1,27 +1,22 @@
-﻿#include "SVGRect.h"
+﻿#include "stdafx.h"
+#include "SVGRect.h"
 
-// Constructor: lưu lại thông tin về vị trí, kích thước, màu sắc và đường viền
-SVGRect::SVGRect(float x, float y, float w, float h,
-    Gdiplus::Color fill,
-    Gdiplus::Color stroke,
-    float strokeW)
-    : x(x), y(y), width(w), height(h),
-    fillColor(fill), strokeColor(stroke), strokeWidth(strokeW) {
-    // Dùng member initializer list để gán giá trị trực tiếp
-}
+//Constructors
+SVGRect::SVGRect(PointF topLeft, float width, float height)
+    : topLeft(topLeft), width(width), height(height) {}
 
 // Hàm draw: vẽ hình chữ nhật bằng GDI+
-void SVGRect::draw(Gdiplus::Graphics* graphics) {
+void SVGRect::draw(Graphics* graphics) const {
     // 1. Tạo bút vẽ viền (Pen) với màu strokeColor và độ dày strokeWidth
-    Gdiplus::Pen pen(strokeColor, strokeWidth);
+    Pen pen(style.strokeColor, style.strokeWidth);
 
     // 2. Tạo cọ (Brush) để tô màu nền với fillColor
-    Gdiplus::SolidBrush brush(fillColor);
+    SolidBrush brush(style.fillColor);
 
     // 3. Tạo một hình chữ nhật theo GDI+ (tọa độ và kích thước dùng kiểu REAL)
-    Gdiplus::RectF rect(
-        static_cast<Gdiplus::REAL>(x),
-        static_cast<Gdiplus::REAL>(y),
+    RectF rect(
+        static_cast<Gdiplus::REAL>(topLeft.X),
+        static_cast<Gdiplus::REAL>(topLeft.Y),
         static_cast<Gdiplus::REAL>(width),
         static_cast<Gdiplus::REAL>(height)
     );

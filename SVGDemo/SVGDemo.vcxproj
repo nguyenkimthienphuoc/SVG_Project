@@ -153,6 +153,7 @@
   <ItemGroup>
     <ClInclude Include="resource.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="SVGBasics.h" />
     <ClInclude Include="SVGCircle.h" />
     <ClInclude Include="SVGDemo.h" />
     <ClInclude Include="SVGElement.h" />

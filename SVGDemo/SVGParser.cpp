@@ -1,4 +1,2 @@
-#include "SVGParser.h"  
-#include <fstream>  
-#include <sstream>  
-#include "rapidxml.hpp"
+#include "stdafx.h"
+#include "SVGParser.h"

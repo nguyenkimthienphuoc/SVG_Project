@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "SVGEllipse.h"
 
-using namespace Gdiplus;
-
 SVGEllipse::SVGEllipse(float cx, float cy, float rx, float ry, const PaintStyle& style)
     : cx(cx), cy(cy), rx(rx), ry(ry) {
     this->style = style;
@@ -35,11 +33,8 @@ float SVGEllipse::getRy() const {
 }
 
 void SVGEllipse::draw(Graphics* graphics) const {
-    Color fill(style.fillColor, style.fillColor, style.fillColor, style.fillColor);
-    Color stroke(style.strokeColor, style.strokeColor, style.strokeColor, style.strokeColor);
-
-    SolidBrush brush(fill);
-    Pen pen(stroke, style.strokeWidth);
+    SolidBrush brush(style.fillColor);
+    Pen pen(style.strokeColor, style.strokeWidth);
 
     float left = cx - rx;
     float top = cy - ry;

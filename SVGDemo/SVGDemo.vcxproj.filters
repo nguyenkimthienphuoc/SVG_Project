@@ -48,6 +48,15 @@
     <ClInclude Include="SVGBasics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SVGEllipse.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SVGPolygon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SVGPolyline.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -69,6 +78,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SVGText.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SVGEllipse.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SVGPolygon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SVGPolyline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

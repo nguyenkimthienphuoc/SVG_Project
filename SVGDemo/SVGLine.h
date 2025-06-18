@@ -2,7 +2,7 @@
 #define SVGLINE_H
 #include "SVGElement.h"
 
-class Line : public SVGElement
+class SVGLine : public SVGElement
 {
 private:
     float x1, x2, y1, y2;

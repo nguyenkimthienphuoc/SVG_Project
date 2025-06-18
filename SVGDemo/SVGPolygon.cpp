@@ -1,5 +1,5 @@
 #include "SVGPolygon.h"
 
-void SVGPolygon::addPoint(const Point& point) {
+void SVGPolygon::addPoint(const PointF& point) {
 	points.push_back(point);
 }

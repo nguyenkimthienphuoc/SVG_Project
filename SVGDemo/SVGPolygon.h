@@ -3,9 +3,11 @@
 #include <vector>
 class SVGPolygon : public SVGElement {
 private:
-	std::vector<Point> points;
+	std::vector<PointF> points;
 public:
 	SVGPolygon() = default;
+	SVGPolygon(const std::vector<PointF>& pts, const PaintStyle& style)
+        : SVGElement(style), points(pts) {}
 	void addPoint(const Point& point);
 	void draw(Graphics* graphics) const override;
 

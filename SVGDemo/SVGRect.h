@@ -7,6 +7,6 @@ public:
     float width;
     float height;
 
-    SVGRect(PointF topLeft, float width, float height);
+    SVGRect(PointF topLeft, float width, float height, const PaintStyle &s);
     void draw(Graphics* graphics) const override;
 };

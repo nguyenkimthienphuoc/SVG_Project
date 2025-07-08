@@ -19,4 +19,4 @@ std::string readSVGFile(const std::string& filePath) {
     buffer << file.rdbuf();
     return buffer.str();  // Trả về nội dung file SVG dưới dạng string
 }
-//parseSVG:...
+//class SVGParser

@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "SVGPolyline.h"
 
 void SVGPolyline::addPoint(const PointF& point) {

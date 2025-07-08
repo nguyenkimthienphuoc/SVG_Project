@@ -1,18 +1,16 @@
 #include "stdafx.h"
 #include "SVGText.h"
 
-SVGText::SVGText(const std::wstring& content, float x, float y, const PaintStyle& style, float fontSize)
-    : text(content), x(x), y(y), fontSize(fontSize) {
-    this->style = style;
-}
+SVGText::SVGText(const std::wstring& textContent, Gdiplus::PointF startPoint, const TextPaintStyle& style, float fontSize)
+    : textContent(textContent), startPoint(startPoint), fontSize(fontSize), style(style){}
 
 void SVGText::setPosition(float x, float y) {
-    this->x = x;
-    this->y = y;
+    this->startPoint.X = x;
+    this->startPoint.Y = y;
 }
 
 void SVGText::setText(const std::wstring& content) {
-    text = content;
+    textContent = content;
 }
 
 void SVGText::setFontSize(float size) {
@@ -20,7 +18,7 @@ void SVGText::setFontSize(float size) {
 }
 
 std::wstring SVGText::getText() const {
-    return text;
+    return textContent;
 }
 
 void SVGText::draw(Graphics* graphics) const {
@@ -30,10 +28,10 @@ void SVGText::draw(Graphics* graphics) const {
     Font font(&fontFamily, fontSize, FontStyleRegular, UnitPixel);
 
     graphics->DrawString(
-        text.c_str(),
+        textContent.c_str(),
         -1,
         &font,
-        PointF(x, y),
+        startPoint,
         &brush
     );
 }

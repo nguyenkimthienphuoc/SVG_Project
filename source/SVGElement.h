@@ -3,7 +3,6 @@
 #include <string>
 #include <windows.h>
 #include <gdiplus.h>
-using namespace Gdiplus;
 
 // Abstract base class
 class SVGElement {

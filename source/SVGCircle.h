@@ -7,9 +7,9 @@ using namespace Gdiplus;
 
 class SVGCircle : public SVGElement {
 public:
-	PointF center;
+	Gdiplus::PointF center;
 	float radius = 0;
 
-	SVGCircle(PointF center, float radius);
+	SVGCircle(Gdiplus::PointF center, float radius);
 	void draw(Graphics* graphics) const override;
 };

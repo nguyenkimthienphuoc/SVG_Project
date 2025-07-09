@@ -17,25 +17,13 @@
 #include <vector>
 #include <string>
 #include <gdiplus.h>
+#include <regex>
 
 using namespace Gdiplus;
 
-std::string readSVGFile(const std::string &filePath)
-{
-   std::ifstream file(filePath);
-   std::stringstream buffer;
-   buffer << file.rdbuf();
-   return buffer.str(); // Trả về nội dung file SVG dưới dạng string
-}
+std::string readSVGFile(const std::string& filePath);
 
-std::string extractAttr(const std::string& tag, const std::string& attrName) {
-   std::regex attrRegex(attrName + "=\\\"([^\"]+)\\\"");
-   std::smatch match;
-   if (std::regex_search(tag, match, attrRegex)) {
-       return match[1].str();
-   }
-   return "";
-}
+std::string extractAttr(const std::string& tag, const std::string& attrName);
 
 // class SVGParser
 class SVGParser
@@ -54,13 +42,13 @@ public:
    void parseSVG();
    void parseHeader();
    Color parseColor(const std::string& colorStr);
-   void parsePainStyle(const std::string &tag);
+   PaintStyle parsePaintStyle(const std::string &tag);
    std::vector<PointF> parsePoints(const std::string& pointStr);
    void parseElements(const std::string &tag);
    SVGElement *createElementFromTag(const std::string &tag);
 
    // Getters
-   std::vector<SVGElement *> getElements() const;
+   std::vector<SVGElement*> getElements() const;
    std::string getHeight() const;
    std::string getWidth() const;
    std::string getRawData() const;

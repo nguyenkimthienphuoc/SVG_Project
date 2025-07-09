@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "SVGParser.h"
 #include "SVGRect.h"
 #include "SVGCircle.h"
@@ -12,8 +12,24 @@
 #include <regex>
 #include <cstring>
 #include <iostream>
-#include <regex>
 #include <vector>
+
+std::string readSVGFile(const std::string& filePath)
+{
+    std::ifstream file(filePath);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str(); // Trả về nội dung file SVG dưới dạng string
+}
+
+std::string extractAttr(const std::string& tag, const std::string& attrName) {
+    std::regex attrRegex(attrName + "=\\\"([^\"]+)\\\"");
+    std::smatch match;
+    if (std::regex_search(tag, match, attrRegex)) {
+        return match[1].str();
+    }
+    return "";
+}
 
 SVGParser::SVGParser(const std::string &filePath)
 {
@@ -174,7 +190,7 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGRect(topLeft, width, height, s);
    }
 
-
+   // circle
    else if (tag.find("<circle") == 0)
    {
        float x = std::stof(extractAttr(tag, "cx"));
@@ -185,6 +201,7 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGCircle(topLeft, radius, s);
    }
 
+   // line
    else if (tag.find("<line") == 0)
    {
        float x1 = std::stof(extractAttr(tag, "x1"));
@@ -195,6 +212,7 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGLine(x1, x2, y1, y2, s);
    }
 
+   // ellipse
    else if (tag.find("<ellipse") == 0)
    {
        float cx = std::stof(extractAttr(tag, "cx"));
@@ -205,6 +223,7 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGEllipse(cx, cy, rx, ry, s);
    }
 
+   //polygon
    else if (tag.find("<polygon") == 0)
    {
        std::string pointStr = extractAttr(tag, "points");
@@ -213,14 +232,7 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGPolygon(points, s);
    }
 
-   else if (tag.find("<polygon") == 0)
-   {
-       std::string pointStr = extractAttr(tag, "points");
-       std::vector<PointF> points = parsePoints(pointStr);
-       PaintStyle s = parsePaintStyle(tag);
-       return new SVGPolygon(points, s);
-   }
-
+   // pollyline
    else if (tag.find("<polyline") == 0)
    {
        std::string pointStr = extractAttr(tag, "points");
@@ -232,21 +244,22 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
    return nullptr;
 }
 
-std::vector<SVGElement *> SVGParser::getElements()
+std::vector<SVGElement*> SVGParser::getElements() const
 {
    return elements;
 }
 
-std::string SVGParser::getHeight()
+std::string SVGParser::getHeight() const
 {
    return heightSVG;
 }
 
-std::string SVGParser::getWidth()
+std::string SVGParser::getWidth() const
 {
    return widthSVG;
 }
 
-std::string SVGParser::getRawData()
+std::string SVGParser::getRawData() const
 {
-   return SVG_Raw_Data;
+    return SVG_Raw_Data;
+}

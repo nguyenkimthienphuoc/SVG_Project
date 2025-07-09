@@ -1,6 +1,8 @@
-#include "stdafx.h"
 #include "SVGPolyline.h"
 
-void SVGPolyline::addPoint(const PointF& point) {
-	points.push_back(point);
+SVGPolyline::SVGPolyline(const std::vector<PointF>& pts, const PaintStyle& s)
+   : SVGElement(s), points(pts) {}
+
+void SVGPolyline::addPoint(const Point& point) {
+   points.push_back(point);
 }

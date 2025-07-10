@@ -9,6 +9,8 @@ private:
 
 public:
     SVGLine(float x1, float x2, float y1, float y2, const PaintStyle &s);
+    void draw(Gdiplus::Graphics* graphics) const override;
+
     float getter_x1() const { return x1; };
     float getter_x2() const { return x2; };
     float getter_y1() const { return y1; };

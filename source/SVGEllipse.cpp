@@ -16,25 +16,14 @@ void SVGEllipse::setRadius(float rx, float ry) {
     this->ry = ry;
 }
 
-float SVGEllipse::getCx() const {
-    return cx;
-}
+float SVGEllipse::getCx() const { return cx; }
+float SVGEllipse::getCy() const { return cy; }
+float SVGEllipse::getRx() const { return rx; }
+float SVGEllipse::getRy() const { return ry; }
 
-float SVGEllipse::getCy() const {
-    return cy;
-}
-
-float SVGEllipse::getRx() const {
-    return rx;
-}
-
-float SVGEllipse::getRy() const {
-    return ry;
-}
-
-void SVGEllipse::draw(Graphics* graphics) const {
-    SolidBrush brush(style.fillColor);
-    Pen pen(style.strokeColor, style.strokeWidth);
+void SVGEllipse::draw(Gdiplus::Graphics* graphics) const {
+    Gdiplus::SolidBrush brush(style.fillColor);
+    Gdiplus::Pen pen(style.strokeColor, style.strokeWidth);
 
     float left = cx - rx;
     float top = cy - ry;

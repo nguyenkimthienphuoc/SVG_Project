@@ -241,6 +241,16 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
        return new SVGPolyline(points, s);
    }
   
+   // path
+   else if (tag.find("<path") == 0) 
+   {
+       std::string data = extractAttr(tag, "d");
+       if (!data.empty()) {
+           PaintStyle style = parsePaintStyle(tag);
+           return new SVGPath(data, style);
+       }
+   }
+
    return nullptr;
 }
 

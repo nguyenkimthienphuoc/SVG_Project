@@ -2,8 +2,9 @@
 #include "SVGCircle.h"
 
 //Constructors
-SVGCircle::SVGCircle(Gdiplus::PointF center, float radius)
+SVGCircle::SVGCircle(Gdiplus::PointF center, float radius, const PaintStyle& s)
     : center(center), radius(radius) {
+    style = s;
 }
 
 void SVGCircle::draw(Gdiplus::Graphics* graphics) const {

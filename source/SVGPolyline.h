@@ -3,10 +3,10 @@
 #include <vector>
 class SVGPolyline : public SVGElement {
 private:
-	std::vector<PointF> points;
+   std::vector<PointF> points;
 public:
-	SVGPolyline() = default;
-	void addPoint(const PointF& point);
-	void draw(Graphics* graphics) const override;
-
+   SVGPolyline() = default;
+   SVGPolyline(const std::vector<PointF>& pts, const PaintStyle& style);
+   void addPoint(const PointF& point);
+   void draw(Graphics* graphics) const override;
 };

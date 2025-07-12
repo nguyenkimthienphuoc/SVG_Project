@@ -2,44 +2,37 @@
 #include "SVGRect.h"
 
 //Constructors
-SVGRect::SVGRect(PointF topLeft, float width, float height, const PaintStyle &s)
-   : topLeft(topLeft), width(width), height(height)
+SVGRect::SVGRect(PointF topLeft, REAL width, REAL height, const PaintStyle &s)
 {
-   style = s;
+	this->topLeft = topLeft;
+	this->width = width;
+	this->height = height;
+	if (width < 0 || height < 0) {
+		this->width = 0; // Đặt chiều rộng về 0 nếu âm
+		this->height = 0; // Đặt chiều cao về 0 nếu âm
+	}
+	this->style = s;
 }
 
 // Hàm draw: vẽ hình chữ nhật bằng GDI+
 void SVGRect::draw(Graphics* graphics) const {
-    // 1. Vùng hình chữ nhật
-    RectF rect(
-        static_cast<Gdiplus::REAL>(topLeft.X),
-        static_cast<Gdiplus::REAL>(topLeft.Y),
-        static_cast<Gdiplus::REAL>(width),
-        static_cast<Gdiplus::REAL>(height)
-    );
+    if (graphics == nullptr) return;
 
-    // 2. Fill nếu cần
-    if (style.fillOpacity > 0.0f) {
-        Color fillColor(
-            static_cast<BYTE>(style.fillOpacity * 255),
+    // Nếu fillOpacity > 0 thì mới vẽ Fill
+    if (style.fillOpacity > 0.0f && style.fillColor.GetAlpha() > 0) {
+        BYTE alpha = static_cast<BYTE>(style.fillOpacity * 255);
+        Color fillColor(alpha,
             style.fillColor.GetRed(),
             style.fillColor.GetGreen(),
-            style.fillColor.GetBlue()
-        );
-        SolidBrush brush(fillColor);
-        graphics->FillRectangle(&brush, rect);
+            style.fillColor.GetBlue());
+        SolidBrush fillBrush(style.fillColor);
+        graphics->FillRectangle(&fillBrush, topLeft.X, topLeft.Y, width, height);
     }
 
-    // 3. Stroke nếu cần
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
-        Color strokeColor(
-            static_cast<BYTE>(style.strokeOpacity * 255),
-            style.strokeColor.GetRed(),
-            style.strokeColor.GetGreen(),
-            style.strokeColor.GetBlue()
-        );
-        Pen pen(strokeColor, style.strokeWidth);
-        graphics->DrawRectangle(&pen, rect);
+    // Nếu strokeWidth > 0 và strokeOpacity > 0 thì mới vẽ viền
+    if (style.strokeWidth != 0) {
+        Pen pen(style.strokeColor, static_cast<REAL>(style.strokeWidth));
+        graphics->DrawRectangle(&pen, static_cast<REAL>(topLeft.X), static_cast<REAL>(topLeft.Y), width, height);
     }
 }
 

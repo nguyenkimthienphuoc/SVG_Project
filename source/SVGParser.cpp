@@ -5,6 +5,7 @@
 #include "SVGLine.h"
 #include "SVGBasics.h"
 #include "SVGEllipse.h"
+#include "SVGText.h"
 
 #include <gdiplus.h>
 #include <fstream>
@@ -14,7 +15,7 @@
 #include <iostream>
 #include <vector>
 
-std::string readSVGFile(const std::string& filePath)
+std::string readSVGFile(const std::string &filePath)
 {
 	std::ifstream file(filePath);
 	std::stringstream buffer;
@@ -22,16 +23,18 @@ std::string readSVGFile(const std::string& filePath)
 	return buffer.str(); // Trả về nội dung file SVG dưới dạng string
 }
 
-std::string extractAttr(const std::string& tag, const std::string& attrName) {
+std::string extractAttr(const std::string &tag, const std::string &attrName)
+{
 	std::regex attrRegex(attrName + "=\\\"([^\"]+)\\\"");
 	std::smatch match;
-	if (std::regex_search(tag, match, attrRegex)) {
+	if (std::regex_search(tag, match, attrRegex))
+	{
 		return match[1].str();
 	}
 	return "";
 }
 
-SVGParser::SVGParser(const std::string& filePath)
+SVGParser::SVGParser(const std::string &filePath)
 {
 	std::string data = readSVGFile(filePath);
 	this->SVG_Raw_Data = data;
@@ -93,20 +96,21 @@ void SVGParser::parseHeader()
 	}
 }
 
-Color SVGParser::parseColor(const std::string& colorStr)
+Color SVGParser::parseColor(const std::string &colorStr)
 {
 	// 1. Check for rgb(r,g,b) format
 	std::regex rgbRegex(R"(rgb\((\d+),\s*(\d+),\s*(\d+)\))");
 	std::smatch match;
 
-	if (std::regex_match(colorStr, match, rgbRegex)) {
+	if (std::regex_match(colorStr, match, rgbRegex))
+	{
 		int r = std::stoi(match[1]);
 		int g = std::stoi(match[2]);
 		int b = std::stoi(match[3]);
 		return Color(255, r, g, b); // default alpha = 255
 	}
 
-	//2. Check for simple color format
+	// 2. Check for simple color format
 	if (colorStr == "red")
 		return Color(255, 255, 0, 0);
 	if (colorStr == "blue")
@@ -121,7 +125,7 @@ Color SVGParser::parseColor(const std::string& colorStr)
 	return Color(255, 0, 0, 0);
 }
 
-PaintStyle SVGParser::parsePaintStyle(const std::string& tag)
+PaintStyle SVGParser::parsePaintStyle(const std::string &tag)
 {
 	PaintStyle s;
 
@@ -129,7 +133,6 @@ PaintStyle SVGParser::parsePaintStyle(const std::string& tag)
 	{
 		s.strokeColor = parseColor(stroke_str);
 	}
-
 
 	if (std::string fill_str = extractAttr(tag, "fill"); !fill_str.empty())
 	{
@@ -160,13 +163,64 @@ PaintStyle SVGParser::parsePaintStyle(const std::string& tag)
 	return s;
 }
 
-std::vector<PointF> SVGParser::parsePoints(const std::string& pointStr)
+TextPaintStyle SVGParser::parseTextStyle(const std::string &tag)
+{
+	TextPaintStyle t;
+	if (std::string fill_str = (extractAttr(tag, "fill")); !fill_str.empty())
+	{
+		t.fillOpacity = parseColor(fill_str);
+	}
+
+	if (std::string fillO = (extractAttr(tag, "fill-opacity")); !fillO.empty())
+	{
+		t.fillOpacity = std::stof(fillO);
+	}
+
+	if (std::string stroke_str = (extractAttr(tag, "stroke")); !stroke_str.empty())
+	{
+		t.strokeColor = parseColor(stroke_str);
+	}
+
+	if (std::string strokeW = (extractAttr(tag, "stroke-width")); !strokeW.empty())
+	{
+		t.strokeWidth = std::stof(strokeW);
+	}
+
+	if (std::string strokeO = (extractAttr(tag, "stroke-opacity")); !stroke_str.empty())
+	{
+		t.strokeWidth = std::stof(strokeO);
+	}
+
+	if (std::string fontFam = (extractAttr(tag, "font-family")); !fontFam.empty())
+	{
+		t.fontFamily = fontFam;
+	}
+
+	if (std::string fontW = (extractAttr(tag, "font-weight")); !fontW.empty())
+	{
+		t.fontWeight = fontW;
+	}
+
+	if (std::string textA = (extractAttr(tag, "text-anchor")); !textA.empty())
+	{
+		t.textAnchor = textA;
+	}
+
+	if (std::string opacity_str = extractAttr(tag, "opacity"); !opacity_str.empty())
+	{
+		t.strokeOpacity *= std::stof(opacity_str);
+		t.fillOpacity *= std::stof(opacity_str);
+	}
+
+	return t;
+}
+
+std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 {
 	std::vector<PointF> points;
 	std::regex coordRegex(R"(([0-9.+-]+)[, ]+([0-9.+-]+))");
 	auto begin = std::sregex_iterator(pointStr.begin(), pointStr.end(), coordRegex);
 	auto end = std::sregex_iterator();
-
 
 	for (auto it = begin; it != end; ++it)
 	{
@@ -177,18 +231,16 @@ std::vector<PointF> SVGParser::parsePoints(const std::string& pointStr)
 	return points;
 }
 
-
-void SVGParser::parseElements(const std::string& tag)
+void SVGParser::parseElements(const std::string &tag)
 {
-	SVGElement* element = createElementFromTag(tag);
+	SVGElement *element = createElementFromTag(tag);
 	if (element)
 	{
 		this->elements.push_back(element);
 	}
 }
 
-
-SVGElement* SVGParser::createElementFromTag(const std::string& tag)
+SVGElement *SVGParser::createElementFromTag(const std::string &tag)
 {
 	// rectangle
 	if (tag.find("<rect") == 0)
@@ -197,7 +249,7 @@ SVGElement* SVGParser::createElementFromTag(const std::string& tag)
 		float y = std::stof(extractAttr(tag, "y"));
 		float width = std::stof(extractAttr(tag, "width"));
 		float height = std::stof(extractAttr(tag, "height"));
-		PointF topLeft{ x, y };
+		PointF topLeft{x, y};
 		PaintStyle s = parsePaintStyle(tag);
 		return new SVGRect(topLeft, width, height, s);
 	}
@@ -208,7 +260,7 @@ SVGElement* SVGParser::createElementFromTag(const std::string& tag)
 		float x = std::stof(extractAttr(tag, "cx"));
 		float y = std::stof(extractAttr(tag, "cy"));
 		float radius = std::stof(extractAttr(tag, "r"));
-		PointF topLeft{ x, y };
+		PointF topLeft{x, y};
 		PaintStyle s = parsePaintStyle(tag);
 		return new SVGCircle(topLeft, radius, s);
 	}
@@ -235,7 +287,7 @@ SVGElement* SVGParser::createElementFromTag(const std::string& tag)
 		return new SVGEllipse(cx, cy, rx, ry, s);
 	}
 
-	//polygon
+	// polygon
 	else if (tag.find("<polygon") == 0)
 	{
 		std::string pointStr = extractAttr(tag, "points");
@@ -257,16 +309,31 @@ SVGElement* SVGParser::createElementFromTag(const std::string& tag)
 	else if (tag.find("<path") == 0)
 	{
 		std::string data = extractAttr(tag, "d");
-		if (!data.empty()) {
+		if (!data.empty())
+		{
 			PaintStyle style = parsePaintStyle(tag);
 			return new SVGPath(data, style);
+		}
+	}
+
+	else if (tag.find("<text") == 0)
+	{
+		std::wstring content = SVGText::getText();
+		if (!content.empty())
+		{
+			float x = stof(extractAttr(tag, "x"));
+			float y = stof(extractAttr(tag, "y"));
+			PointF startPoint{x, y};
+			TextPainStyle t = parsePaintStyle(tag);
+			float size = stof(extractAttr(tag, "font-size"));
+			return new SVGText(content, startPoint, t, size);
 		}
 	}
 
 	return nullptr;
 }
 
-std::vector<SVGElement*> SVGParser::getElements() const
+std::vector<SVGElement *> SVGParser::getElements() const
 {
 	return elements;
 }

@@ -5,7 +5,8 @@
 #include "SVGLine.h"
 #include "SVGBasics.h"
 #include "SVGEllipse.h"
-
+#include "SVGPolygon.h"
+#include "SVGPolyline.h"
 #include <gdiplus.h>
 #include <fstream>
 #include <sstream>
@@ -23,13 +24,14 @@ std::string readSVGFile(const std::string& filePath)
 }
 
 std::string extractAttr(const std::string& tag, const std::string& attrName) {
-	std::regex attrRegex(attrName + "=\\\"([^\"]+)\\\"");
+	std::regex attrRegex("\\b" + attrName + "=\"([^\"]+)\"");
 	std::smatch match;
 	if (std::regex_search(tag, match, attrRegex)) {
 		return match[1].str();
 	}
 	return "";
 }
+
 
 SVGParser::SVGParser(const std::string& filePath)
 {
@@ -42,6 +44,7 @@ SVGParser::SVGParser(const std::string& filePath)
 		exit(1);
 	}
 	parseHeader();
+
 }
 
 SVGParser::~SVGParser()
@@ -193,12 +196,12 @@ SVGElement* SVGParser::createElementFromTag(const std::string& tag)
 	// rectangle
 	if (tag.find("<rect") == 0)
 	{
-		float x = std::stof(extractAttr(tag, "x"));
-		float y = std::stof(extractAttr(tag, "y"));
-		float width = std::stof(extractAttr(tag, "width"));
-		float height = std::stof(extractAttr(tag, "height"));
-		PointF topLeft{ x, y };
 		PaintStyle s = parsePaintStyle(tag);
+		REAL x = static_cast<REAL>(std::stof(extractAttr(tag, "x")));
+		REAL y = static_cast<REAL>(std::stof(extractAttr(tag, "y")));
+		REAL width = static_cast<REAL>(std::stof(extractAttr(tag, "width")));
+		REAL height = static_cast<REAL>(std::stof(extractAttr(tag, "height")));
+		PointF topLeft(x, y);
 		return new SVGRect(topLeft, width, height, s);
 	}
 

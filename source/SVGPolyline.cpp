@@ -13,27 +13,38 @@ void SVGPolyline::addPoint(const Gdiplus::PointF& point) {
 void SVGPolyline::draw(Graphics* graphics) const {
     if (points.size() < 2) return;
 
-    // Chuyển vector sang mảng
+    // Chuyển vector<PointF> thành mảng để GDI+ dùng
     int count = static_cast<int>(points.size());
     std::unique_ptr<PointF[]> arr(new PointF[count]);
-    for (int i = 0; i < count; ++i) arr[i] = points[i];
+    for (int i = 0; i < count; ++i) {
+        arr[i] = points[i];
+    }
 
-    // Fill nếu có opacity
+    // 1. Fill (nếu có fillOpacity > 0)
     if (style.fillOpacity > 0.0f) {
-        BYTE fillA = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
-        Color fillC(style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB());
-        fillC.SetValue((fillA << 24) | (fillC.GetR() << 16) | (fillC.GetG() << 8) | fillC.GetB());
-        SolidBrush brush(fillC);
-        // Sử dụng FillPolygon để fill vùng giữa các đoạn thẳng
+        // Tạo màu với alpha
+        BYTE alpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
+        Color fillColor(alpha,
+            style.fillColor.GetR(),
+            style.fillColor.GetG(),
+            style.fillColor.GetB());
+        SolidBrush brush(fillColor);
+
+        // FillPolygon sẽ tự đóng kín mảng điểm
         graphics->FillPolygon(&brush, arr.get(), count);
     }
 
-    // Stroke nếu cần
+    // 2. Stroke (nếu cần)
     if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
-        BYTE strokeA = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
-        Color strokeC(style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB());
-        strokeC.SetValue((strokeA << 24) | (strokeC.GetR() << 16) | (strokeC.GetG() << 8) | strokeC.GetB());
-        Pen pen(strokeC, style.strokeWidth);
+        BYTE alpha = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
+        Color strokeColor(alpha,
+            style.strokeColor.GetR(),
+            style.strokeColor.GetG(),
+            style.strokeColor.GetB());
+        Pen pen(strokeColor, style.strokeWidth);
+
+        // Vẽ đường nối các điểm theo thứ tự (mở)
         graphics->DrawLines(&pen, arr.get(), count);
     }
 }
+

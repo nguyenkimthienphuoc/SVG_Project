@@ -18,10 +18,10 @@ struct TextPaintStyle {
     Gdiplus::Color fillColor = Gdiplus::Color(255, 0, 0, 0);      // mặc định: đen, không trong suốt
     float fillOpacity = 1.0f;
 
-    //// Viền chữ (ít dùng nhưng SVG vẫn hỗ trợ)
-    //Color strokeColor = Color(0, 0, 0, 0);      // mặc định: không viền
-    //float strokeWidth = 0.0f;
-    //float strokeOpacity = 1.0f;
+    // Viền chữ (ít dùng nhưng SVG vẫn hỗ trợ)
+    Gdiplus::Color strokeColor = Color(0, 0, 0, 0);       //mặc định: không viền
+    float strokeWidth = 0.0f;
+    float strokeOpacity = 1.0f;
 
     // Font
     std::string fontFamily = "Arial";          // font mặc định

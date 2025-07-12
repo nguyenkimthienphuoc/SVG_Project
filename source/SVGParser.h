@@ -43,6 +43,7 @@ public:
    void parseHeader();
    Color parseColor(const std::string& colorStr);
    PaintStyle parsePaintStyle(const std::string &tag);
+   TextPaintStyle parseTextStyle (const std::string& tag);
    std::vector<PointF> parsePoints(const std::string& pointStr);
    void parseElements(const std::string &tag);
    SVGElement *createElementFromTag(const std::string &tag);

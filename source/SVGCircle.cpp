@@ -1,9 +1,10 @@
 #include "stdafx.h"
 #include "SVGCircle.h"
 
-// Constructor
-SVGCircle::SVGCircle(Gdiplus::PointF center, float radius)
+//Constructors
+SVGCircle::SVGCircle(Gdiplus::PointF center, float radius, const PaintStyle& s)
     : center(center), radius(radius) {
+    style = s;
 }
 
 // Draw the circle using GDI+

@@ -25,6 +25,7 @@ void SVGPath::draw(Graphics* graphics) const {
         case 'M': // Move to
             ss >> x >> y;
             currentPoint = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
+            startPoint = currentPoint;
             gp.StartFigure();
             break;
 
@@ -79,6 +80,51 @@ void SVGPath::draw(Graphics* graphics) const {
 
             gp.AddBezier(currentPoint, control1, p2, end);
             prevControlPoint = p2;
+            currentPoint = end;
+            prevCommand = upperCmd;
+            break;
+        case 'Q':
+            ss >> x1 >> y1 >> x >> y;
+            p1 = isRelative ? Gdiplus::PointF(currentPoint.X + x1, currentPoint.Y + y1) : Gdiplus::PointF(x1, y1);
+            end = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
+
+            // Convert to cubic Bézier
+            gp.AddBezier(
+                currentPoint,
+                Gdiplus::PointF(currentPoint.X + (2.0f / 3.0f) * (p1.X - currentPoint.X),
+                    currentPoint.Y + (2.0f / 3.0f) * (p1.Y - currentPoint.Y)),
+                Gdiplus::PointF(end.X + (2.0f / 3.0f) * (p1.X - end.X),
+                    end.Y + (2.0f / 3.0f) * (p1.Y - end.Y)),
+                end
+            );
+
+            prevControlPoint = p1;
+            currentPoint = end;
+            prevCommand = upperCmd;
+            break;
+
+        case 'T':
+            ss >> x >> y;
+            end = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
+
+            if (prevCommand == 'Q' || prevCommand == 'T') {
+                p1.X = 2 * currentPoint.X - prevControlPoint.X;
+                p1.Y = 2 * currentPoint.Y - prevControlPoint.Y;
+            }
+            else {
+                p1 = currentPoint;
+            }
+
+            gp.AddBezier(
+                currentPoint,
+                Gdiplus::PointF(currentPoint.X + (2.0f / 3.0f) * (p1.X - currentPoint.X),
+                    currentPoint.Y + (2.0f / 3.0f) * (p1.Y - currentPoint.Y)),
+                Gdiplus::PointF(end.X + (2.0f / 3.0f) * (p1.X - end.X),
+                    end.Y + (2.0f / 3.0f) * (p1.Y - end.Y)),
+                end
+            );
+
+            prevControlPoint = p1;
             currentPoint = end;
             prevCommand = upperCmd;
             break;

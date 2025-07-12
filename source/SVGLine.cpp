@@ -4,7 +4,7 @@ SVGLine::SVGLine(float x1, float x2, float y1, float y2, const PaintStyle& s) : 
 }
 void SVGLine::draw(Graphics* graphics) const {
 	//Calculate the color with precise opacity
-	BYTE alpha = static_cast<BYTE>(style.strokeOpacity * 255);
+	BYTE alpha = static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA());
 
 	//color = stroke color + opacity (combined)
 	Gdiplus::Color color(alpha, style.strokeColor.GetRed(), style.strokeColor.GetGreen(), style.strokeColor.GetBlue());

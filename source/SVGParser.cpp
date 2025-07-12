@@ -6,7 +6,8 @@
 #include "SVGBasics.h"
 #include "SVGEllipse.h"
 #include "SVGText.h"
-
+#include "SVGPolygon.h"
+#include "SVGPolyline.h"
 #include <gdiplus.h>
 #include <fstream>
 #include <sstream>
@@ -23,9 +24,10 @@ std::string readSVGFile(const std::string &filePath)
 	return buffer.str(); // Trả về nội dung file SVG dưới dạng string
 }
 
-std::string extractAttr(const std::string &tag, const std::string &attrName)
-{
-	std::regex attrRegex(attrName + "=\\\"([^\"]+)\\\"");
+std::string extractAttr(const std::string& tag, const std::string& attrName) {
+	// Ghép regex động dạng: " attrName="..."
+	std::string pattern = "(?:\\s|^)" + attrName + "=\"([^\"]+)\"";
+	std::regex attrRegex(pattern);
 	std::smatch match;
 	if (std::regex_search(tag, match, attrRegex))
 	{
@@ -34,7 +36,8 @@ std::string extractAttr(const std::string &tag, const std::string &attrName)
 	return "";
 }
 
-SVGParser::SVGParser(const std::string &filePath)
+
+SVGParser::SVGParser(const std::string& filePath)
 {
 	std::string data = readSVGFile(filePath);
 	this->SVG_Raw_Data = data;
@@ -45,6 +48,7 @@ SVGParser::SVGParser(const std::string &filePath)
 		exit(1);
 	}
 	parseHeader();
+
 }
 
 SVGParser::~SVGParser()
@@ -245,12 +249,12 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
 	// rectangle
 	if (tag.find("<rect") == 0)
 	{
-		float x = std::stof(extractAttr(tag, "x"));
-		float y = std::stof(extractAttr(tag, "y"));
-		float width = std::stof(extractAttr(tag, "width"));
-		float height = std::stof(extractAttr(tag, "height"));
-		PointF topLeft{x, y};
 		PaintStyle s = parsePaintStyle(tag);
+		REAL x = static_cast<REAL>(std::stof(extractAttr(tag, "x")));
+		REAL y = static_cast<REAL>(std::stof(extractAttr(tag, "y")));
+		REAL width = static_cast<REAL>(std::stof(extractAttr(tag, "width")));
+		REAL height = static_cast<REAL>(std::stof(extractAttr(tag, "height")));
+		PointF topLeft(x, y);
 		return new SVGRect(topLeft, width, height, s);
 	}
 

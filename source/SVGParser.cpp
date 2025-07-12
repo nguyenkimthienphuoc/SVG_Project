@@ -24,7 +24,9 @@ std::string readSVGFile(const std::string& filePath)
 }
 
 std::string extractAttr(const std::string& tag, const std::string& attrName) {
-	std::regex attrRegex("\\b" + attrName + "=\"([^\"]+)\"");
+	// Ghép regex động dạng: " attrName="..."
+	std::string pattern = "(?:\\s|^)" + attrName + "=\"([^\"]+)\"";
+	std::regex attrRegex(pattern);
 	std::smatch match;
 	if (std::regex_search(tag, match, attrRegex)) {
 		return match[1].str();

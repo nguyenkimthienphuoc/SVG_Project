@@ -35,7 +35,20 @@ std::string extractAttr(const std::string& tag, const std::string& attrName) {
 	}
 	return "";
 }
+std::wstring extractInnerText(const std::string& tag) {
+	std::regex contentRegex(R"(>([^<]+)<)");
+	std::smatch match;
 
+	if (std::regex_search(tag, match, contentRegex)) {
+		std::string raw = match[1].str();
+
+		// Chuyển từ string thành wstring
+		std::wstring wideValue(raw.begin(), raw.end());
+
+		return wideValue;
+	}
+	return L"";
+}
 
 SVGParser::SVGParser(const std::string& filePath)
 {
@@ -62,15 +75,31 @@ SVGParser::~SVGParser()
 
 void SVGParser::parseSVG()
 {
-	std::regex tagRegex(R"(<(\w+)([^>]*)>)");
+	// 1. Lấy tất cả thẻ <text>...</text>
+	std::regex textTagRegex(R"(<text\b[^>]*>[\s\S]*?<\/text>)", std::regex::icase);
 	std::smatch match;
-	std::string::const_iterator searchStart(SVG_Raw_Data.cbegin());
+	std::string textSearch = SVG_Raw_Data;
 
-	while (std::regex_search(searchStart, SVG_Raw_Data.cend(), match, tagRegex))
-	{
-		std::string tag = match[0];
-		parseElements(tag);
-		searchStart = match.suffix().first;
+	while (std::regex_search(textSearch, match, textTagRegex)) {
+		std::string fullTextTag = match[0];
+		parseElements(fullTextTag);
+		textSearch = match.suffix().str();
+	}
+
+	// 2. Xử lý các tag đơn còn lại
+	std::regex simpleTagRegex(R"(<(\w+)([^>]*)/?>)");
+	std::smatch match2;
+	std::string simpleSearch = SVG_Raw_Data;
+
+	while (std::regex_search(simpleSearch, match2, simpleTagRegex)) {
+		std::string tag = match2[0];
+
+		// Bỏ qua text (đã xử lý)
+		if (tag.find("<text") != 0 && tag.find("</text>") == std::string::npos) {
+			parseElements(tag);
+		}
+
+		simpleSearch = match2.suffix().str();
 	}
 }
 
@@ -172,7 +201,7 @@ TextPaintStyle SVGParser::parseTextStyle(const std::string &tag)
 	TextPaintStyle t;
 	if (std::string fill_str = (extractAttr(tag, "fill")); !fill_str.empty())
 	{
-		t.fillOpacity = parseColor(fill_str);
+		t.fillColor = parseColor(fill_str);
 	}
 
 	if (std::string fillO = (extractAttr(tag, "fill-opacity")); !fillO.empty())
@@ -190,7 +219,7 @@ TextPaintStyle SVGParser::parseTextStyle(const std::string &tag)
 		t.strokeWidth = std::stof(strokeW);
 	}
 
-	if (std::string strokeO = (extractAttr(tag, "stroke-opacity")); !stroke_str.empty())
+	if (std::string strokeO = (extractAttr(tag, "stroke-opacity")); !strokeO.empty())
 	{
 		t.strokeWidth = std::stof(strokeO);
 	}
@@ -320,15 +349,17 @@ SVGElement *SVGParser::createElementFromTag(const std::string &tag)
 		}
 	}
 
+	// text
 	else if (tag.find("<text") == 0)
 	{
-		std::wstring content = SVGText::getText();
+        std::wstring content = extractInnerText(tag);
+
 		if (!content.empty())
 		{
 			float x = stof(extractAttr(tag, "x"));
 			float y = stof(extractAttr(tag, "y"));
 			PointF startPoint{x, y};
-			TextPainStyle t = parsePaintStyle(tag);
+			TextPaintStyle t = parseTextStyle(tag);
 			float size = stof(extractAttr(tag, "font-size"));
 			return new SVGText(content, startPoint, t, size);
 		}

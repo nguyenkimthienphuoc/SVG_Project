@@ -63,7 +63,7 @@ void SVGPath::draw(Graphics* graphics) const {
             currentPoint = end;
             prevCommand = upperCmd;
             break;
-        case 'S': // Smooth cubic Bézier curve
+        case 'S': {// Smooth cubic Bézier curve
             ss >> x2 >> y2 >> x >> y;
 
             p2 = isRelative ? Gdiplus::PointF(currentPoint.X + x2, currentPoint.Y + y2) : Gdiplus::PointF(x2, y2);
@@ -83,7 +83,8 @@ void SVGPath::draw(Graphics* graphics) const {
             currentPoint = end;
             prevCommand = upperCmd;
             break;
-        case 'Q':
+        }
+        case 'Q': {
             ss >> x1 >> y1 >> x >> y;
             p1 = isRelative ? Gdiplus::PointF(currentPoint.X + x1, currentPoint.Y + y1) : Gdiplus::PointF(x1, y1);
             end = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
@@ -102,8 +103,8 @@ void SVGPath::draw(Graphics* graphics) const {
             currentPoint = end;
             prevCommand = upperCmd;
             break;
-
-        case 'T':
+        }
+        case 'T': {
             ss >> x >> y;
             end = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
 
@@ -130,6 +131,7 @@ void SVGPath::draw(Graphics* graphics) const {
             break;
         }
     }
+}
 
     // Fill and stroke
     SolidBrush fillBrush(Color(

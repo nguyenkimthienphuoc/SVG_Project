@@ -8,13 +8,17 @@
 #include "SVGText.h"
 #include "SVGPolygon.h"
 #include "SVGPolyline.h"
+#include "SVGPath.h"
+#include "../rapidxml/rapidxml.hpp"
+#include <windows.h>
+#include <objidl.h>
 #include <gdiplus.h>
 #include <fstream>
 #include <sstream>
-#include <regex>
 #include <cstring>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 std::string readSVGFile(const std::string &filePath)
 {
@@ -24,33 +28,25 @@ std::string readSVGFile(const std::string &filePath)
 	return buffer.str(); // Trả về nội dung file SVG dưới dạng string
 }
 
-std::string extractAttr(const std::string& tag, const std::string& attrName) {
-	// Ghép regex động dạng: " attrName="..."
-	std::string pattern = "(?:\\s|^)" + attrName + "=\"([^\"]+)\"";
-	std::regex attrRegex(pattern);
-	std::smatch match;
-	if (std::regex_search(tag, match, attrRegex))
-	{
-		return match[1].str();
+std::string extractAttr(rapidxml::xml_node<>* node, const std::string& attrName) {
+	rapidxml::xml_attribute<>* attr = node->first_attribute(attrName.c_str());
+	if (attr) {
+		return std::string(attr->value());
 	}
 	return "";
 }
-std::wstring extractInnerText(const std::string& tag) {
-	std::regex contentRegex(R"(>([^<]+)<)");
-	std::smatch match;
 
-	if (std::regex_search(tag, match, contentRegex)) {
-		std::string raw = match[1].str();
-
+std::wstring extractText(rapidxml::xml_node<>* node) {
+	if (node->value()) {
+		std::string raw(node->value());
 		// Chuyển từ string thành wstring
 		std::wstring wideValue(raw.begin(), raw.end());
-
 		return wideValue;
 	}
 	return L"";
 }
 
-SVGParser::SVGParser(const std::string& filePath)
+SVGParser::SVGParser(const std::string& filePath) : xmlData(nullptr)
 {
 	std::string data = readSVGFile(filePath);
 	this->SVG_Raw_Data = data;
@@ -60,8 +56,24 @@ SVGParser::SVGParser(const std::string& filePath)
 		std::cerr << "Failed to read SVG file." << std::endl;
 		exit(1);
 	}
-	parseHeader();
 
+	// Parse XML using RapidXML
+	try {
+		// Create a copy for RapidXML (it modifies the string)
+		xmlData = new char[data.size() + 1];
+		strcpy_s(xmlData, data.size() + 1, data.c_str());
+		
+		doc.parse<0>(xmlData);
+		parseHeader();
+	}
+	catch (const rapidxml::parse_error& e) {
+		std::cerr << "XML Parse error: " << e.what() << std::endl;
+		if (xmlData) {
+			delete[] xmlData;
+			xmlData = nullptr;
+		}
+		exit(1);
+	}
 }
 
 SVGParser::~SVGParser()
@@ -71,124 +83,136 @@ SVGParser::~SVGParser()
 		delete elements[i];
 	}
 	elements.clear();
+	
+	if (xmlData) {
+		delete[] xmlData;
+		xmlData = nullptr;
+	}
 }
 
 void SVGParser::parseSVG()
 {
-	// 1. Lấy tất cả thẻ <text>...</text>
-	std::regex textTagRegex(R"(<text\b[^>]*>[\s\S]*?<\/text>)", std::regex::icase);
-	std::smatch match;
-	std::string textSearch = SVG_Raw_Data;
-
-	while (std::regex_search(textSearch, match, textTagRegex)) {
-		std::string fullTextTag = match[0];
-		parseElements(fullTextTag);
-		textSearch = match.suffix().str();
-	}
-
-	// 2. Xử lý các tag đơn còn lại
-	std::regex simpleTagRegex(R"(<(\w+)([^>]*)/?>)");
-	std::smatch match2;
-	std::string simpleSearch = SVG_Raw_Data;
-
-	while (std::regex_search(simpleSearch, match2, simpleTagRegex)) {
-		std::string tag = match2[0];
-
-		// Bỏ qua text (đã xử lý)
-		if (tag.find("<text") != 0 && tag.find("</text>") == std::string::npos) {
-			parseElements(tag);
+	std::cout << "Starting SVG parsing..." << std::endl;
+	rapidxml::xml_node<>* svgRoot = doc.first_node("svg");
+	if (svgRoot) {
+		std::cout << "Found SVG root node" << std::endl;
+		// Duyệt qua tất cả các child nodes của SVG
+		int nodeCount = 0;
+		for (rapidxml::xml_node<>* child = svgRoot->first_node(); child; child = child->next_sibling()) {
+			std::cout << "Processing node: " << child->name() << std::endl;
+			parseNode(child);
+			nodeCount++;
 		}
+		std::cout << "Processed " << nodeCount << " nodes" << std::endl;
+	} else {
+		std::cout << "Error: No SVG root node found!" << std::endl;
+	}
+	std::cout << "Total elements created: " << elements.size() << std::endl;
+}
 
-		simpleSearch = match2.suffix().str();
+void SVGParser::parseNode(rapidxml::xml_node<>* node)
+{
+	if (!node) return;
+	
+	std::cout << "Parsing node: " << node->name() << std::endl;
+	
+	// Tạo element từ node hiện tại
+	SVGElement* element = createElementFromNode(node);
+	if (element) {
+		this->elements.push_back(element);
+		std::cout << "Successfully created element for: " << node->name() << std::endl;
+	} else {
+		std::cout << "Failed to create element for: " << node->name() << std::endl;
+	}
+	
+	// Đệ quy xử lý các child nodes (hierarchical structure)
+	for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
+		parseNode(child);
 	}
 }
 
 void SVGParser::parseHeader()
 {
-	std::regex SVG_Tag_Regex(R"(<svg\s+[^>]+>)");
-	std::smatch match;
-
-	if (std::regex_search(SVG_Raw_Data, match, SVG_Tag_Regex))
-	{
-		std::string SVG_Tag = match.str();
-
-		std::regex widthRegex("width=\"([^\"]+)\"");
-		std::regex heightRegex("height=\"([^\"]+)\"");
-
-		std::smatch widthMatch;
-		if (std::regex_search(SVG_Raw_Data, widthMatch, widthRegex))
-		{
-			this->widthSVG = widthMatch[1];
-		}
-
-		std::smatch heightMatch;
-		if (std::regex_search(SVG_Raw_Data, heightMatch, heightRegex))
-		{
-			this->heightSVG = heightMatch[1];
-		}
+	rapidxml::xml_node<>* svgRoot = doc.first_node("svg");
+	if (svgRoot) {
+		this->widthSVG = extractAttr(svgRoot, "width");
+		this->heightSVG = extractAttr(svgRoot, "height");
 	}
 }
 
 Color SVGParser::parseColor(const std::string &colorStr)
 {
 	// 1. Check for rgb(r,g,b) format
-	std::regex rgbRegex(R"(rgb\((\d+),\s*(\d+),\s*(\d+)\))");
-	std::smatch match;
-
-	if (std::regex_match(colorStr, match, rgbRegex))
-	{
-		int r = std::stoi(match[1]);
-		int g = std::stoi(match[2]);
-		int b = std::stoi(match[3]);
-		return Color(255, r, g, b); // default alpha = 255
+	if (colorStr.find("rgb(") == 0) {
+		size_t start = colorStr.find('(') + 1;
+		size_t end = colorStr.find(')');
+		if (start != std::string::npos && end != std::string::npos) {
+			std::string rgbValues = colorStr.substr(start, end - start);
+			
+			// Parse r,g,b values
+			std::vector<int> values;
+			std::stringstream ss(rgbValues);
+			std::string item;
+			
+			while (std::getline(ss, item, ',')) {
+				// Remove spaces
+				item.erase(0, item.find_first_not_of(" \t"));
+				item.erase(item.find_last_not_of(" \t") + 1);
+				values.push_back(std::stoi(item));
+			}
+			
+			if (values.size() == 3) {
+				return Color(255, values[0], values[1], values[2]);
+			}
+		}
 	}
 
 	// 2. Check for simple color format
 	if (colorStr == "red")
-		return Color(255, 255, 0, 0);
+		return Gdiplus::Color(255, 255, 0, 0);
 	if (colorStr == "blue")
-		return Color(255, 0, 0, 255);
+		return Gdiplus::Color(255, 0, 0, 255);
 	if (colorStr == "green")
-		return Color(255, 0, 128, 0);
+		return Gdiplus::Color(255, 0, 128, 0);
 	if (colorStr == "black")
-		return Color(255, 0, 0, 0);
+		return Gdiplus::Color(255, 0, 0, 0);
 	if (colorStr == "white")
-		return Color(255, 255, 255, 255);
+		return Gdiplus::Color(255, 255, 255, 255);
 
-	return Color(255, 0, 0, 0);
+	return Gdiplus::Color(255, 0, 0, 0);
 }
 
-PaintStyle SVGParser::parsePaintStyle(const std::string &tag)
+PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 {
 	PaintStyle s;
 
-	if (std::string stroke_str = extractAttr(tag, "stroke"); !stroke_str.empty())
+	if (std::string stroke_str = extractAttr(node, "stroke"); !stroke_str.empty())
 	{
 		s.strokeColor = parseColor(stroke_str);
 	}
 
-	if (std::string fill_str = extractAttr(tag, "fill"); !fill_str.empty())
+	if (std::string fill_str = extractAttr(node, "fill"); !fill_str.empty())
 	{
 		s.fillColor = parseColor(fill_str);
 	}
 
-	if (std::string opacity_str = extractAttr(tag, "opacity"); !opacity_str.empty())
+	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())
 	{
 		s.strokeOpacity *= std::stof(opacity_str);
 		s.fillOpacity *= std::stof(opacity_str);
 	}
 
-	if (std::string fillO = extractAttr(tag, "fill-opacity"); !fillO.empty())
+	if (std::string fillO = extractAttr(node, "fill-opacity"); !fillO.empty())
 	{
 		s.fillOpacity = std::stof(fillO);
 	}
 
-	if (std::string strokeO = extractAttr(tag, "stroke-opacity"); !strokeO.empty())
+	if (std::string strokeO = extractAttr(node, "stroke-opacity"); !strokeO.empty())
 	{
 		s.strokeOpacity = std::stof(strokeO);
 	}
 
-	if (std::string strokeW = extractAttr(tag, "stroke-width"); !strokeW.empty())
+	if (std::string strokeW = extractAttr(node, "stroke-width"); !strokeW.empty())
 	{
 		s.strokeWidth = std::stof(strokeW);
 	}
@@ -196,50 +220,50 @@ PaintStyle SVGParser::parsePaintStyle(const std::string &tag)
 	return s;
 }
 
-TextPaintStyle SVGParser::parseTextStyle(const std::string &tag)
+TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
 {
 	TextPaintStyle t;
-	if (std::string fill_str = (extractAttr(tag, "fill")); !fill_str.empty())
+	if (std::string fill_str = (extractAttr(node, "fill")); !fill_str.empty())
 	{
 		t.fillColor = parseColor(fill_str);
 	}
 
-	if (std::string fillO = (extractAttr(tag, "fill-opacity")); !fillO.empty())
+	if (std::string fillO = (extractAttr(node, "fill-opacity")); !fillO.empty())
 	{
 		t.fillOpacity = std::stof(fillO);
 	}
 
-	if (std::string stroke_str = (extractAttr(tag, "stroke")); !stroke_str.empty())
+	if (std::string stroke_str = (extractAttr(node, "stroke")); !stroke_str.empty())
 	{
 		t.strokeColor = parseColor(stroke_str);
 	}
 
-	if (std::string strokeW = (extractAttr(tag, "stroke-width")); !strokeW.empty())
+	if (std::string strokeW = (extractAttr(node, "stroke-width")); !strokeW.empty())
 	{
 		t.strokeWidth = std::stof(strokeW);
 	}
 
-	if (std::string strokeO = (extractAttr(tag, "stroke-opacity")); !strokeO.empty())
+	if (std::string strokeO = (extractAttr(node, "stroke-opacity")); !strokeO.empty())
 	{
 		t.strokeWidth = std::stof(strokeO);
 	}
 
-	if (std::string fontFam = (extractAttr(tag, "font-family")); !fontFam.empty())
+	if (std::string fontFam = (extractAttr(node, "font-family")); !fontFam.empty())
 	{
 		t.fontFamily = fontFam;
 	}
 
-	if (std::string fontW = (extractAttr(tag, "font-weight")); !fontW.empty())
+	if (std::string fontW = (extractAttr(node, "font-weight")); !fontW.empty())
 	{
 		t.fontWeight = fontW;
 	}
 
-	if (std::string textA = (extractAttr(tag, "text-anchor")); !textA.empty())
+	if (std::string textA = (extractAttr(node, "text-anchor")); !textA.empty())
 	{
 		t.textAnchor = textA;
 	}
 
-	if (std::string opacity_str = extractAttr(tag, "opacity"); !opacity_str.empty())
+	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())
 	{
 		t.strokeOpacity *= std::stof(opacity_str);
 		t.fillOpacity *= std::stof(opacity_str);
@@ -250,121 +274,203 @@ TextPaintStyle SVGParser::parseTextStyle(const std::string &tag)
 
 std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 {
+	std::cout << "Parsing points string: '" << pointStr << "'" << std::endl;
 	std::vector<PointF> points;
-	std::regex coordRegex(R"(([0-9.+-]+)[, ]+([0-9.+-]+))");
-	auto begin = std::sregex_iterator(pointStr.begin(), pointStr.end(), coordRegex);
-	auto end = std::sregex_iterator();
-
-	for (auto it = begin; it != end; ++it)
-	{
-		float x = std::stof((*it)[1]);
-		float y = std::stof((*it)[2]);
-		points.emplace_back(x, y);
+	std::vector<float> coords;
+	
+	// Replace commas with spaces first
+	std::string processedStr = pointStr;
+	for (char& c : processedStr) {
+		if (c == ',') {
+			c = ' ';
+		}
 	}
+	
+	std::cout << "After comma replacement: '" << processedStr << "'" << std::endl;
+	
+	std::stringstream ss(processedStr);
+	std::string token;
+	
+	// Parse coordinates separated by spaces
+	while (ss >> token) {
+		if (!token.empty()) {
+			std::cout << "Found coordinate: " << token << std::endl;
+			coords.push_back(std::stof(token));
+		}
+	}
+	
+	std::cout << "Total coordinates found: " << coords.size() << std::endl;
+	
+	// Create points from pairs of coordinates
+	for (size_t i = 0; i + 1 < coords.size(); i += 2) {
+		PointF point(coords[i], coords[i + 1]);
+		points.push_back(point);
+		std::cout << "Created point: (" << coords[i] << ", " << coords[i + 1] << ")" << std::endl;
+	}
+	
+	std::cout << "Total points created: " << points.size() << std::endl;
 	return points;
 }
 
-void SVGParser::parseElements(const std::string &tag)
+SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 {
-	SVGElement *element = createElementFromTag(tag);
-	if (element)
-	{
-		this->elements.push_back(element);
-	}
-}
-
-SVGElement *SVGParser::createElementFromTag(const std::string &tag)
-{
+	if (!node) return nullptr;
+	
+	std::string nodeName = node->name();
+	std::cout << "Creating element for: " << nodeName << std::endl;
+	
 	// rectangle
-	if (tag.find("<rect") == 0)
+	if (nodeName == "rect")
 	{
-		PaintStyle s = parsePaintStyle(tag);
-		REAL x = static_cast<REAL>(std::stof(extractAttr(tag, "x")));
-		REAL y = static_cast<REAL>(std::stof(extractAttr(tag, "y")));
-		REAL width = static_cast<REAL>(std::stof(extractAttr(tag, "width")));
-		REAL height = static_cast<REAL>(std::stof(extractAttr(tag, "height")));
-		PointF topLeft(x, y);
-		return new SVGRect(topLeft, width, height, s);
+		PaintStyle s = parsePaintStyle(node);
+		std::string xStr = extractAttr(node, "x");
+		std::string yStr = extractAttr(node, "y");
+		std::string widthStr = extractAttr(node, "width");
+		std::string heightStr = extractAttr(node, "height");
+		
+		std::cout << "Rect attributes - x:" << xStr << " y:" << yStr << " width:" << widthStr << " height:" << heightStr << std::endl;
+		
+		if (!xStr.empty() && !yStr.empty() && !widthStr.empty() && !heightStr.empty()) {
+			REAL x = static_cast<REAL>(std::stof(xStr));
+			REAL y = static_cast<REAL>(std::stof(yStr));
+			REAL width = static_cast<REAL>(std::stof(widthStr));
+			REAL height = static_cast<REAL>(std::stof(heightStr));
+			PointF topLeft(x, y);
+			std::cout << "Created rect successfully" << std::endl;
+			return new SVGRect(topLeft, width, height, s);
+		}
 	}
 
 	// circle
-	else if (tag.find("<circle") == 0)
+	else if (nodeName == "circle")
 	{
-		float x = std::stof(extractAttr(tag, "cx"));
-		float y = std::stof(extractAttr(tag, "cy"));
-		float radius = std::stof(extractAttr(tag, "r"));
-		PointF topLeft{x, y};
-		PaintStyle s = parsePaintStyle(tag);
-		return new SVGCircle(topLeft, radius, s);
+		std::string cxStr = extractAttr(node, "cx");
+		std::string cyStr = extractAttr(node, "cy");
+		std::string rStr = extractAttr(node, "r");
+		
+		std::cout << "Circle attributes - cx:" << cxStr << " cy:" << cyStr << " r:" << rStr << std::endl;
+		
+		if (!cxStr.empty() && !cyStr.empty() && !rStr.empty()) {
+			float x = std::stof(cxStr);
+			float y = std::stof(cyStr);
+			float radius = std::stof(rStr);
+			PointF topLeft{x, y};
+			PaintStyle s = parsePaintStyle(node);
+			std::cout << "Created circle successfully" << std::endl;
+			return new SVGCircle(topLeft, radius, s);
+		}
 	}
 
 	// line
-	else if (tag.find("<line") == 0)
+	else if (nodeName == "line")
 	{
-		float x1 = std::stof(extractAttr(tag, "x1"));
-		float y1 = std::stof(extractAttr(tag, "y1"));
-		float x2 = std::stof(extractAttr(tag, "x2"));
-		float y2 = std::stof(extractAttr(tag, "y2"));
-		PaintStyle s = parsePaintStyle(tag);
-		return new SVGLine(x1, x2, y1, y2, s);
+		std::string x1Str = extractAttr(node, "x1");
+		std::string y1Str = extractAttr(node, "y1");
+		std::string x2Str = extractAttr(node, "x2");
+		std::string y2Str = extractAttr(node, "y2");
+		
+		std::cout << "Line attributes - x1:" << x1Str << " y1:" << y1Str << " x2:" << x2Str << " y2:" << y2Str << std::endl;
+		
+		if (!x1Str.empty() && !y1Str.empty() && !x2Str.empty() && !y2Str.empty()) {
+			float x1 = std::stof(x1Str);
+			float y1 = std::stof(y1Str);
+			float x2 = std::stof(x2Str);
+			float y2 = std::stof(y2Str);
+			PaintStyle s = parsePaintStyle(node);
+			std::cout << "Created line successfully" << std::endl;
+			return new SVGLine(x1, x2, y1, y2, s);
+		}
 	}
 
 	// ellipse
-	else if (tag.find("<ellipse") == 0)
+	else if (nodeName == "ellipse")
 	{
-		float cx = std::stof(extractAttr(tag, "cx"));
-		float cy = std::stof(extractAttr(tag, "cy"));
-		float rx = std::stof(extractAttr(tag, "rx"));
-		float ry = std::stof(extractAttr(tag, "ry"));
-		PaintStyle s = parsePaintStyle(tag);
-		return new SVGEllipse(cx, cy, rx, ry, s);
+		std::string cxStr = extractAttr(node, "cx");
+		std::string cyStr = extractAttr(node, "cy");
+		std::string rxStr = extractAttr(node, "rx");
+		std::string ryStr = extractAttr(node, "ry");
+		
+		std::cout << "Ellipse attributes - cx:" << cxStr << " cy:" << cyStr << " rx:" << rxStr << " ry:" << ryStr << std::endl;
+		
+		if (!cxStr.empty() && !cyStr.empty() && !rxStr.empty() && !ryStr.empty()) {
+			float cx = std::stof(cxStr);
+			float cy = std::stof(cyStr);
+			float rx = std::stof(rxStr);
+			float ry = std::stof(ryStr);
+			PaintStyle s = parsePaintStyle(node);
+			std::cout << "Created ellipse successfully" << std::endl;
+			return new SVGEllipse(cx, cy, rx, ry, s);
+		}
 	}
 
 	// polygon
-	else if (tag.find("<polygon") == 0)
+	else if (nodeName == "polygon")
 	{
-		std::string pointStr = extractAttr(tag, "points");
-		std::vector<PointF> points = parsePoints(pointStr);
-		PaintStyle s = parsePaintStyle(tag);
-		return new SVGPolygon(points, s);
+		std::string pointStr = extractAttr(node, "points");
+		std::cout << "Polygon points: " << pointStr << std::endl;
+		if (!pointStr.empty()) {
+			std::vector<PointF> points = parsePoints(pointStr);
+			std::cout << "Parsed " << points.size() << " points for polygon" << std::endl;
+			PaintStyle s = parsePaintStyle(node);
+			std::cout << "Created polygon successfully" << std::endl;
+			return new SVGPolygon(points, s);
+		}
 	}
 
-	// pollyline
-	else if (tag.find("<polyline") == 0)
+	// polyline
+	else if (nodeName == "polyline")
 	{
-		std::string pointStr = extractAttr(tag, "points");
-		std::vector<PointF> points = parsePoints(pointStr);
-		PaintStyle s = parsePaintStyle(tag);
-		return new SVGPolyline(points, s);
+		std::string pointStr = extractAttr(node, "points");
+		std::cout << "Polyline points: " << pointStr << std::endl;
+		if (!pointStr.empty()) {
+			std::vector<PointF> points = parsePoints(pointStr);
+			std::cout << "Parsed " << points.size() << " points for polyline" << std::endl;
+			PaintStyle s = parsePaintStyle(node);
+			std::cout << "Created polyline successfully" << std::endl;
+			return new SVGPolyline(points, s);
+		}
 	}
 
 	// path
-	else if (tag.find("<path") == 0)
+	else if (nodeName == "path")
 	{
-		std::string data = extractAttr(tag, "d");
+		std::string data = extractAttr(node, "d");
+		std::cout << "Path data: " << data << std::endl;
 		if (!data.empty())
 		{
-			PaintStyle style = parsePaintStyle(tag);
+			PaintStyle style = parsePaintStyle(node);
+			std::cout << "Created path successfully" << std::endl;
 			return new SVGPath(data, style);
 		}
 	}
 
 	// text
-	else if (tag.find("<text") == 0)
+	else if (nodeName == "text")
 	{
-        std::wstring content = extractInnerText(tag);
+        std::wstring content = extractText(node);
+		std::cout << "Text content length: " << content.length() << std::endl;
 
 		if (!content.empty())
 		{
-			float x = stof(extractAttr(tag, "x"));
-			float y = stof(extractAttr(tag, "y"));
-			PointF startPoint{x, y};
-			TextPaintStyle t = parseTextStyle(tag);
-			float size = stof(extractAttr(tag, "font-size"));
-			return new SVGText(content, startPoint, t, size);
+			std::string xStr = extractAttr(node, "x");
+			std::string yStr = extractAttr(node, "y");
+			std::string sizeStr = extractAttr(node, "font-size");
+			
+			std::cout << "Text attributes - x:" << xStr << " y:" << yStr << " font-size:" << sizeStr << std::endl;
+			
+			if (!xStr.empty() && !yStr.empty() && !sizeStr.empty()) {
+				float x = stof(xStr);
+				float y = stof(yStr);
+				PointF startPoint{x, y};
+				TextPaintStyle t = parseTextStyle(node);
+				float size = stof(sizeStr);
+				std::cout << "Created text successfully" << std::endl;
+				return new SVGText(content, startPoint, t, size);
+			}
 		}
 	}
 
+	std::cout << "No element created for: " << nodeName << std::endl;
 	return nullptr;
 }
 

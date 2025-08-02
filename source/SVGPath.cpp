@@ -1,12 +1,33 @@
 ﻿#include "stdafx.h"
+#include <algorithm>
+#include <iostream>
 SVGPath::SVGPath(const std::string& data, const PaintStyle& style) : pathData(data) {
     this->style = style;
 }
 void SVGPath::draw(Graphics* graphics) const {
     if (!graphics) return;
 
+    // Preprocess path data to handle SVG format properly
+    std::string processedData = pathData;
+    
+    // Add spaces around commands for easier parsing
+    for (char c : "MmLlHhVvCcSsQqTtAaZz") {
+        std::string target(1, c);
+        std::string replacement = std::string(" ") + c + " ";
+        
+        size_t pos = 0;
+        while ((pos = processedData.find(target, pos)) != std::string::npos) {
+            processedData.replace(pos, 1, replacement);
+            pos += replacement.length();
+        }
+    }
+    
+    // Replace commas with spaces
+    std::replace(processedData.begin(), processedData.end(), ',', ' ');
+    
+
     Gdiplus::GraphicsPath gp;
-    std::istringstream ss(pathData);
+    std::istringstream ss(processedData);
     char cmd;
     float x, y, x1, y1, x2, y2 = 0;
     Gdiplus::PointF currentPoint(0, 0);

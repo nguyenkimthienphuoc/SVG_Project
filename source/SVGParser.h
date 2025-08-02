@@ -11,19 +11,21 @@
 #include "SVGPath.h"
 #include "SVGPolygon.h"
 #include "SVGPolyline.h"
+#include "../rapidxml/rapidxml.hpp"
 
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
 #include <gdiplus.h>
-#include <regex>
+#include <cstring>
 
 using namespace Gdiplus;
 
 std::string readSVGFile(const std::string& filePath);
 
-std::string extractAttr(const std::string& tag, const std::string& attrName);
+std::string extractAttr(rapidxml::xml_node<>* node, const std::string& attrName);
+std::wstring extractText(rapidxml::xml_node<>* node);
 
 // class SVGParser
 class SVGParser
@@ -32,6 +34,8 @@ private:
    std::string SVG_Raw_Data;
    std::string heightSVG, widthSVG;
    std::vector<SVGElement *> elements;
+   rapidxml::xml_document<> doc;
+   char* xmlData; // Store XML data for RapidXML
 
 public:
    // Constructor and Destructor
@@ -41,12 +45,12 @@ public:
    // Methods
    void parseSVG();
    void parseHeader();
+   void parseNode(rapidxml::xml_node<>* node);
    Color parseColor(const std::string& colorStr);
-   PaintStyle parsePaintStyle(const std::string &tag);
-   TextPaintStyle parseTextStyle (const std::string& tag);
+   PaintStyle parsePaintStyle(rapidxml::xml_node<>* node);
+   TextPaintStyle parseTextStyle(rapidxml::xml_node<>* node);
    std::vector<PointF> parsePoints(const std::string& pointStr);
-   void parseElements(const std::string &tag);
-   SVGElement *createElementFromTag(const std::string &tag);
+   SVGElement *createElementFromNode(rapidxml::xml_node<>* node);
 
    // Getters
    std::vector<SVGElement*> getElements() const;

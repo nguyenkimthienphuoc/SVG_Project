@@ -104,7 +104,7 @@ void SVGScaleByXY::visit(SVGText *text)
     float newX = startPoint.X * x;
     float newY = startPoint.Y * y;
     text->setPosition(newX, newY);
-    text->setFontSize(text->getSize() * std::max(x, y)); // Scale font size by the larger factor
+    text->setFontSize(text->getSize() * max(x, y)); // Scale font size by the larger factor
 }
 
 // Scale the ellipse's radii by the x and y factors

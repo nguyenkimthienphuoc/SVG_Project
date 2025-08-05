@@ -82,7 +82,7 @@ void SVGRotate::visit(SVGEllipse *ellipse)
     float newY = cx * sin(radian) + cy * cos(radian);
 
     // Update the ellipse's center
-    ellipse->setCenter(PointF(newX, newY));
+    ellipse->setCenter(newX, newY);
 }
 
 /* void SVGRotate::visit(SVGPath *path)

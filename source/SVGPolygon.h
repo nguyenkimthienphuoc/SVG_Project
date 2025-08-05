@@ -12,4 +12,5 @@ public:
    void accept(SVGVisitor* visitor) override;
 
    const std::vector<PointF>& getPoints() const { return points; }
+   void setPoints(vector<PointF> points) { this->points = points; }
 };

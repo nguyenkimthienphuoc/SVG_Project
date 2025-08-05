@@ -12,6 +12,7 @@
 #include "SVGElement.h"
 #include "SVGBasics.h"
 #include <cmath>
+#include "corecrt_math_defines.h"
 class SVGRotate : public SVGVisitor
 {
 private:

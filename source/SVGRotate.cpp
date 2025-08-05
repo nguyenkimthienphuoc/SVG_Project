@@ -1,88 +1,102 @@
 #include "stdafx.h"
 #include "SVGRotate.h"
+#include "SVGGroup.h"
 
 void SVGRotate::visit(SVGCircle *circle)
 {
-    // Rotate the circle around its center
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
+    
+    // Get circle center for rotation
     PointF center = circle->getCenter();
-    float radius = circle->getRadius();
     
-    // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
-    float newX = center.X * cos(radian) - center.Y * sin(radian);
-    float newY = center.X * sin(radian) + center.Y * cos(radian);
+    // Rotate around circle center
+    rotateMatrix.RotateAt(degree, center);
     
-    // Update the circle's position
-    circle->setCenter(PointF(newX, newY));
+    // Apply the rotation transform to the element
+    circle->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to circle around center (" 
+              << center.X << ", " << center.Y << ")" << std::endl;
 }
 
 void SVGRotate::visit(SVGRect *rectangle)
 {
-    // Rotate the rectangle around its top-left corner
-    PointF topLeft = rectangle->topLeft;
-    float width = rectangle->width;
-    float height = rectangle->height;
-
-    // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
-    float newX = topLeft.X * cos(radian) - topLeft.Y * sin(radian);
-    float newY = topLeft.X * sin(radian) + topLeft.Y * cos(radian);
-
-    // Update the rectangle's position
-    rectangle->topLeft = PointF(newX, newY);
+    // Apply rotation using matrix transform instead of changing coordinates
+    Gdiplus::Matrix rotateMatrix;
+    
+    // Calculate center of rectangle for rotation
+    float centerX = rectangle->topLeft.X + rectangle->width / 2;
+    float centerY = rectangle->topLeft.Y + rectangle->height / 2;
+    
+    // Rotate around rectangle center
+    rotateMatrix.RotateAt(degree, Gdiplus::PointF(centerX, centerY));
+    
+    // Apply the rotation transform to the element
+    rectangle->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees around center (" 
+              << centerX << ", " << centerY << ")" << std::endl;
 }
 
 void SVGRotate::visit(SVGLine *line)
 {
-    // Rotate the line's start and end points
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
+    
+    // Calculate line center for rotation
     float x1 = line->getter_x1();
     float y1 = line->getter_y1();
     float x2 = line->getter_x2();
     float y2 = line->getter_y2();
-
-    // Calculate new positions after rotation
-    float radian = degree * (M_PI / 180.0f);
-    float newX1 = x1 * cos(radian) - y1 * sin(radian);
-    float newY1 = x1 * sin(radian) + y1 * cos(radian);
-    float newX2 = x2 * cos(radian) - y2 * sin(radian);
-    float newY2 = x2 * sin(radian) + y2 * cos(radian);
-
-    // Update the line's start and end points
-    line->setStart(newX1, newY1);
-    line->setEnd(newX2, newY2);
+    float centerX = (x1 + x2) / 2;
+    float centerY = (y1 + y2) / 2;
+    
+    // Rotate around line center
+    rotateMatrix.RotateAt(degree, Gdiplus::PointF(centerX, centerY));
+    
+    // Apply the rotation transform to the element
+    line->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to line around center (" 
+              << centerX << ", " << centerY << ")" << std::endl;
 }
 
 void SVGRotate::visit(SVGText *text)
 {
-    // Rotate the text's starting point
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
+    
+    // Get text position for rotation
     PointF startPoint = text->getStartPoint();
-    float size = text->getSize();
-
-    // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
-    float newX = startPoint.X * cos(radian) - startPoint.Y * sin(radian);
-    float newY = startPoint.X * sin(radian) + startPoint.Y * cos(radian);
-
-    // Update the text's starting point
-    text->setStart(PointF(newX, newY));
+    
+    // Rotate around text position
+    rotateMatrix.RotateAt(degree, startPoint);
+    
+    // Apply the rotation transform to the element
+    text->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to text around position (" 
+              << startPoint.X << ", " << startPoint.Y << ")" << std::endl;
 }
 
 void SVGRotate::visit(SVGEllipse *ellipse)
 {
-    // Rotate the ellipse around its center
-    float rx = ellipse->getRx();
-    float ry = ellipse->getRy();
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
+    
+    // Get ellipse center for rotation
     float cx = ellipse->getCx();
     float cy = ellipse->getCy();
-
-
-    // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
-    float newX = cx * cos(radian) - cy * sin(radian);
-    float newY = cx * sin(radian) + cy * cos(radian);
-
-    // Update the ellipse's center
-    ellipse->setCenter(newX, newY);
+    
+    // Rotate around ellipse center
+    rotateMatrix.RotateAt(degree, Gdiplus::PointF(cx, cy));
+    
+    // Apply the rotation transform to the element
+    ellipse->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to ellipse around center (" 
+              << cx << ", " << cy << ")" << std::endl;
 }
 
 /* void SVGRotate::visit(SVGPath *path)
@@ -92,26 +106,71 @@ void SVGRotate::visit(SVGEllipse *ellipse)
 
 void SVGRotate::visit(SVGPolygon *polygon)
 {
-    // Rotate each point of the polygon
-    std::vector<PointF> points = polygon->getPoints();
-    float radian = degree * (M_PI / 180.0f);
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
     
-    for (auto& point : points) {
-        float newX = point.X * cos(radian) - point.Y * sin(radian);
-        float newY = point.X * sin(radian) + point.Y * cos(radian);
-        point = PointF(newX, newY);
+    // Calculate polygon centroid for rotation
+    std::vector<PointF> points = polygon->getPoints();
+    if (points.empty()) return;
+    
+    float centerX = 0, centerY = 0;
+    for (const auto& point : points) {
+        centerX += point.X;
+        centerY += point.Y;
     }
+    centerX /= points.size();
+    centerY /= points.size();
+    
+    // Rotate around polygon center
+    rotateMatrix.RotateAt(degree, Gdiplus::PointF(centerX, centerY));
+    
+    // Apply the rotation transform to the element
+    polygon->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to polygon around center (" 
+              << centerX << ", " << centerY << ")" << std::endl;
 }
 
 void SVGRotate::visit(SVGPolyline *polyline)
 {
-    // Rotate each point of the polyline
-    std::vector<PointF> points = polyline->getPoints();
-    float radian = degree * (M_PI / 180.0f);
+    // Apply rotation using matrix transform
+    Gdiplus::Matrix rotateMatrix;
     
-    for (auto& point : points) {
-        float newX = point.X * cos(radian) - point.Y * sin(radian);
-        float newY = point.X * sin(radian) + point.Y * cos(radian);
-        point = PointF(newX, newY);
+    // Calculate polyline centroid for rotation
+    std::vector<PointF> points = polyline->getPoints();
+    if (points.empty()) return;
+    
+    float centerX = 0, centerY = 0;
+    for (const auto& point : points) {
+        centerX += point.X;
+        centerY += point.Y;
+    }
+    centerX /= points.size();
+    centerY /= points.size();
+    
+    // Rotate around polyline center
+    rotateMatrix.RotateAt(degree, Gdiplus::PointF(centerX, centerY));
+    
+    // Apply the rotation transform to the element
+    polyline->applyTransform(rotateMatrix);
+    
+    std::cout << "Applied matrix rotation " << degree << " degrees to polyline around center (" 
+              << centerX << ", " << centerY << ")" << std::endl;
+}
+
+void SVGRotate::visit(SVGPath *path)
+{
+    // For paths, we can apply transformation matrix
+    // Since path data is string-based, we'll use the transform matrix approach
+    Gdiplus::Matrix rotateMatrix;
+    rotateMatrix.Rotate(degree);
+    path->applyTransform(rotateMatrix);
+}
+
+void SVGRotate::visit(SVGGroup *group)
+{
+    // Apply rotation to all children in the group
+    for (auto child : group->getChildren()) {
+        child->accept(this);
     }
 }

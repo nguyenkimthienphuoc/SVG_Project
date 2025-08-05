@@ -1,5 +1,8 @@
 #include "stdafx.h"
 #include "SVGScale.h"
+#include "SVGGroup.h"
+
+// SVGScaleByTimes implementations
 
 // Scale the circle's radius by the given times
 void SVGScaleByTimes::visit(SVGCircle *circle)
@@ -70,14 +73,32 @@ void SVGScaleByTimes::visit(SVGPolyline *polyline)
     polyline->setPoints(points);
 }
 
-// Scale the circle's radius by the x factor
+void SVGScaleByTimes::visit(SVGPath *path)
+{
+    // For paths, use transformation matrix
+    Gdiplus::Matrix scaleMatrix;
+    scaleMatrix.Scale(times, times);
+    path->applyTransform(scaleMatrix);
+}
+
+void SVGScaleByTimes::visit(SVGGroup *group)
+{
+    // Apply scaling to all children in the group
+    for (auto child : group->getChildren()) {
+        child->accept(this);
+    }
+}
+
+// SVGScaleByXY implementations
+
+// Scale the circle's radius by the x factor (assuming uniform scaling for simplicity)
 void SVGScaleByXY::visit(SVGCircle *circle)
 {
-    float newRadius = circle->getRadius() * x; // Assuming uniform scaling for simplicity
+    float newRadius = circle->getRadius() * x; // Using x factor for radius
     circle->setRadius(newRadius);
 }
 
-// Scale the line's start and end points by the x and y factors
+// Scale the rectangle's width and height by the x and y factors
 void SVGScaleByXY::visit(SVGRect *rectangle)
 {
     float newWidth = rectangle->getWidth() * x;
@@ -137,4 +158,20 @@ void SVGScaleByXY::visit(SVGPolyline *polyline)
         point.Y *= y;
     }
     polyline->setPoints(points);
+}
+
+void SVGScaleByXY::visit(SVGPath *path)
+{
+    // For paths, use transformation matrix
+    Gdiplus::Matrix scaleMatrix;
+    scaleMatrix.Scale(x, y);
+    path->applyTransform(scaleMatrix);
+}
+
+void SVGScaleByXY::visit(SVGGroup *group)
+{
+    // Apply scaling to all children in the group
+    for (auto child : group->getChildren()) {
+        child->accept(this);
+    }
 }

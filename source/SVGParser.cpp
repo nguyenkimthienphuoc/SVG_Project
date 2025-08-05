@@ -1,25 +1,4 @@
 ﻿#include "stdafx.h"
-#include "SVGParser.h"
-#include "SVGRect.h"
-#include "SVGCircle.h"
-#include "SVGLine.h"
-#include "SVGBasics.h"
-#include "SVGEllipse.h"
-#include "SVGText.h"
-#include "SVGPolygon.h"
-#include "SVGPolyline.h"
-#include "SVGPath.h"
-#include "SVGGroup.h"
-#include "../rapidxml/rapidxml.hpp"
-#include <windows.h>
-#include <objidl.h>
-#include <gdiplus.h>
-#include <fstream>
-#include <sstream>
-#include <cstring>
-#include <iostream>
-#include <vector>
-#include <algorithm>
 
 std::string readSVGFile(const std::string &filePath)
 {
@@ -347,8 +326,13 @@ std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 void SVGParser::parseTransform(SVGElement* element, const std::string& transformStr) {
 	std::stringstream ss(transformStr);
 	std::string token;
+	std::cout << "Parsing transform: " << transformStr << std::endl;
 
 	while (std::getline(ss, token, ')')) {
+		// Clean whitespace
+		token.erase(0, token.find_first_not_of(" \t"));
+		token.erase(token.find_last_not_of(" \t") + 1);
+		
 		if (token.find("translate(") != std::string::npos) {
 			float tx = 0, ty = 0;
 			std::string content = token.substr(token.find('(') + 1);
@@ -363,11 +347,49 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 				tx = std::stof(xStr);
 			}
 
-			Gdiplus::Matrix m;
-			m.Translate(tx, ty);
-			element->applyTransform(m);
+			// Apply translation using visitor pattern
+			SVGTranslate translateVisitor(tx, ty);
+			element->accept(&translateVisitor);
+			std::cout << "Applied translate(" << tx << ", " << ty << ")" << std::endl;
 		}
-		// TO DO 'scale' and 'rotate'
+		else if (token.find("rotate(") != std::string::npos) {
+			float degree = 0;
+			std::string content = token.substr(token.find('(') + 1);
+			
+			// Parse rotate(angle)
+			std::stringstream vals(content);
+			std::string angleStr;
+			if (std::getline(vals, angleStr, ',')) {
+				degree = std::stof(angleStr);
+			}
+			
+			// Apply rotation using visitor pattern
+			SVGRotate rotateVisitor(degree);
+			element->accept(&rotateVisitor);
+			std::cout << "Applied rotate(" << degree << ")" << std::endl;
+		}
+		else if (token.find("scale(") != std::string::npos) {
+			float sx = 1, sy = 1;
+			std::string content = token.substr(token.find('(') + 1);
+			std::stringstream vals(content);
+			std::string xStr, yStr;
+
+			if (std::getline(vals, xStr, ',') && std::getline(vals, yStr, ',')) {
+				sx = std::stof(xStr);
+				sy = std::stof(yStr);
+				// Apply XY scaling using visitor pattern
+				SVGScaleByXY scaleVisitor(sx, sy);
+				element->accept(&scaleVisitor);
+				std::cout << "Applied scale(" << sx << ", " << sy << ")" << std::endl;
+			}
+			else if (!xStr.empty()) {
+				sx = std::stof(xStr);
+				// Apply uniform scaling using visitor pattern
+				SVGScaleByTimes scaleVisitor(sx);
+				element->accept(&scaleVisitor);
+				std::cout << "Applied scale(" << sx << ")" << std::endl;
+			}
+		}
 	}
 }
 

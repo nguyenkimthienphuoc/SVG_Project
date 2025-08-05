@@ -176,6 +176,7 @@
     <ClInclude Include="SVGRotate.h" />
     <ClInclude Include="SVGScale.h" />
     <ClInclude Include="SVGText.h" />
+    <ClInclude Include="SVGTranslate.h" />
     <ClInclude Include="SVGVisitor.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -199,6 +200,7 @@
     <ClCompile Include="SVGRotate.cpp" />
     <ClCompile Include="SVGScale.cpp" />
     <ClCompile Include="SVGText.cpp" />
+    <ClCompile Include="SVGTranslate.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SVGDemo.rc" />

@@ -1,6 +1,11 @@
 #include "stdafx.h"
 #include "SVGEllipse.h"
 
+// function helps double dispatch
+void SVGEllipse::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 SVGEllipse::SVGEllipse(float cx, float cy, float rx, float ry, const PaintStyle& style)
     : cx(cx), cy(cy), rx(rx), ry(ry) {
     this->style = style;

@@ -22,5 +22,6 @@ public:
     void setRawData(const std::string& raw) { pathData = raw; }
     const std::string& getPathData() const { return pathData; };
     void draw(Graphics *graphics) const override;
+    void accept(SVGVisitor* visitor) override;
 };
 #endif

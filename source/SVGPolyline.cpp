@@ -1,6 +1,11 @@
 ﻿#include "stdafx.h"
 #include "SVGPolyline.h"
 
+// Function helps double dispatch
+void SVGPolyline::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 SVGPolyline::SVGPolyline(const std::vector<Gdiplus::PointF>& pts, const PaintStyle& s) {
 	points = pts;
 	this->style = s;

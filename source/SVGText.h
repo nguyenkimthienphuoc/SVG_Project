@@ -18,4 +18,9 @@ public:
     std::wstring getText() const;
 
     void draw(Graphics* graphics) const override;
+
+    // Setter and Getter methods
+    Gdiplus::PointF getStartPoint() const { return startPoint; }
+    float getSize() const { return fontSize; }
+    void setStart(Gdiplus::PointF newStartPoint) { startPoint = newStartPoint; }
 };

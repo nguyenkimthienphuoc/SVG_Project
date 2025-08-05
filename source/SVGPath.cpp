@@ -1,6 +1,12 @@
 ﻿#include "stdafx.h"
 #include <algorithm>
 #include <iostream>
+
+// Function helps double dispatch
+void SVGPath::accept(SVGVisitor* visitor){
+	visitor->visit(this);
+}
+
 SVGPath::SVGPath(const std::string& data, const PaintStyle& style) : pathData(data) {
     this->style = style;
 }

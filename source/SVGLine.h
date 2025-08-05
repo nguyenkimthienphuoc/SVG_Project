@@ -17,6 +17,7 @@ public:
     float getter_y2() const { return y2; };
     void setStart(float x, float y) { x1 = x; y1 = y; }
     void setEnd(float x, float y) { x2 = x; y2 = y; }
+    void accept(SVGVisitor* visitor) override;
 };
 
 #endif

@@ -1,6 +1,11 @@
 #include "stdafx.h"
 #include "SVGPolygon.h"
 
+// Function helps double dispatch
+void SVGPolygon::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 SVGPolygon::SVGPolygon(const std::vector<PointF>& pts, const PaintStyle& style) {
 	points = pts;
 	this->style = style;

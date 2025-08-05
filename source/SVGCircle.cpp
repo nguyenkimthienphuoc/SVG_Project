@@ -1,6 +1,11 @@
 ﻿#include "stdafx.h"
 #include "SVGCircle.h"
 
+// Function helps double dispatch
+void SVGCircle::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 //Constructors
 SVGCircle::SVGCircle(Gdiplus::PointF center, float radius, const PaintStyle& s)
     : center(center), radius(radius) {

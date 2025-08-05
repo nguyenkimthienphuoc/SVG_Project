@@ -1,6 +1,11 @@
 ﻿#include "stdafx.h"
 #include "SVGEllipse.h"
 
+// function helps double dispatch
+void SVGEllipse::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 SVGEllipse::SVGEllipse(float cx, float cy, float rx, float ry, const PaintStyle& style)
     : cx(cx), cy(cy), rx(rx), ry(ry) {
     this->style = style;
@@ -54,6 +59,7 @@ void SVGEllipse::draw(Gdiplus::Graphics* graphics) const {
         Pen strokePen(strokeColor, style.strokeWidth);
         graphics->DrawEllipse(&strokePen, left, top, width, height);
     }
+
     // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);
 }

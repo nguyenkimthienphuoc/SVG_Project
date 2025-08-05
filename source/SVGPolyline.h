@@ -9,4 +9,8 @@ public:
    SVGPolyline(const std::vector<PointF>& pts, const PaintStyle& style);
    void addPoint(const PointF& point);
    void draw(Graphics* graphics) const override;
+   void accept(SVGVisitor* vistor) override;
+
+   // Getter
+   const std::vector<PointF>& getPoints() const { return points; }
 };

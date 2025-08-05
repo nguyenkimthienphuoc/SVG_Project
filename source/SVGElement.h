@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "SVGBasics.h"
+#include "SVGVisitor.h"
 #include <string>
 #include <windows.h>
 #include <gdiplus.h>
@@ -15,6 +16,8 @@ public:
 	virtual ~SVGElement() = default; // Must have 
 
 	virtual void draw(Graphics* graphics) const = 0;
+
+	virtual void accept(SVGVisitor* visitor) = 0;
 
     // Áp dụng transform
     virtual void applyTransform(const Gdiplus::Matrix& m) {
@@ -44,4 +47,5 @@ public:
     const Gdiplus::Matrix& getTransform() const {
         return transformMatrix;
     }
+
 };

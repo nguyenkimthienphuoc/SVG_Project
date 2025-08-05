@@ -1,6 +1,11 @@
 ﻿#include "stdafx.h"
 #include "SVGRect.h"
 
+// Function helps double dispatch
+void SVGRect::accept(SVGVisitor* visitor){
+    visitor->visit(this);
+}
+
 //Constructors
 SVGRect::SVGRect(PointF topLeft, REAL width, REAL height, const PaintStyle &s)
 {

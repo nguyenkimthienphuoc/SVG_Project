@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "SVGCircle.h"
 
 //Constructors
@@ -7,11 +7,19 @@ SVGCircle::SVGCircle(Gdiplus::PointF center, float radius, const PaintStyle& s)
     style = s;
 }
 
+
+
 // Draw the circle using GDI+
 // This uses the style's fill color, stroke color, and stroke width,
 // making it flexible and consistent with other SVG elements.
 void SVGCircle::draw(Gdiplus::Graphics* graphics) const {
     if (!graphics) return; // Safety check to avoid null pointer dereference
+
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
 
     // Calculate the top-left corner and diameter of the bounding box for the circle
     float left = center.X - radius;
@@ -39,4 +47,7 @@ void SVGCircle::draw(Gdiplus::Graphics* graphics) const {
         Pen strokePen(strokeColor, style.strokeWidth);
         graphics->DrawEllipse(&strokePen, left, top, diameter, diameter);
     }
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }

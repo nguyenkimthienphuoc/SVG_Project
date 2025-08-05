@@ -18,6 +18,12 @@ void SVGPolyline::addPoint(const Gdiplus::PointF& point) {
 void SVGPolyline::draw(Graphics* graphics) const {
     if (points.size() < 2) return;
 
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
+
     // Chuyển vector<PointF> thành mảng để GDI+ dùng
     int count = static_cast<int>(points.size());
     std::unique_ptr<PointF[]> arr(new PointF[count]);
@@ -51,5 +57,8 @@ void SVGPolyline::draw(Graphics* graphics) const {
         // Vẽ đường nối các điểm theo thứ tự (mở)
         graphics->DrawLines(&pen, arr.get(), count);
     }
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }
 

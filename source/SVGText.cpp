@@ -26,6 +26,12 @@ std::wstring SVGText::getText() const {
 void SVGText::draw(Gdiplus::Graphics* graphics) const {
     if (!graphics) return;
 
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
+
     Gdiplus::SolidBrush brush(style.fillColor);
 
     Gdiplus::FontFamily fontFamily(L"Arial");
@@ -63,4 +69,7 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
         &stringFormat,
         &brush
     );
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }

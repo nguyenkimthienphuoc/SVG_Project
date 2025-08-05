@@ -19,25 +19,55 @@ SVGRect::SVGRect(PointF topLeft, REAL width, REAL height, const PaintStyle &s)
 	this->style = s;
 }
 
-// Hàm draw: vẽ hình chữ nhật bằng GDI+
 void SVGRect::draw(Graphics* graphics) const {
     if (graphics == nullptr) return;
 
-    // Nếu fillOpacity > 0 thì mới vẽ Fill
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
+
+    // Vẽ phần Fill (nếu có)
     if (style.fillOpacity > 0.0f) {
         BYTE alpha = static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA());
-        Color fillColor(alpha,
+        Color fillColor(
+            alpha,
             style.fillColor.GetRed(),
             style.fillColor.GetGreen(),
-            style.fillColor.GetBlue());
+            style.fillColor.GetBlue()
+        );
         SolidBrush fillBrush(fillColor);
-        graphics->FillRectangle(&fillBrush, topLeft.X, topLeft.Y, width, height);
+
+        graphics->FillRectangle(
+            &fillBrush,
+            static_cast<REAL>(topLeft.X),
+            static_cast<REAL>(topLeft.Y),
+            static_cast<REAL>(width),
+            static_cast<REAL>(height)
+        );
     }
 
-    // Nếu strokeWidth > 0 và strokeOpacity > 0 thì mới vẽ viền
-    if (style.strokeWidth > 0.0f) {
-        Pen pen(style.strokeColor, static_cast<REAL>(style.strokeWidth));
-        graphics->DrawRectangle(&pen, static_cast<REAL>(topLeft.X), static_cast<REAL>(topLeft.Y), width, height);
+    // Vẽ phần Stroke (nếu có)
+    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
+        BYTE alpha = static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA());
+        Color strokeColor(
+            alpha,
+            style.strokeColor.GetRed(),
+            style.strokeColor.GetGreen(),
+            style.strokeColor.GetBlue()
+        );
+        Pen pen(strokeColor, static_cast<REAL>(style.strokeWidth));
+
+        graphics->DrawRectangle(
+            &pen,
+            static_cast<REAL>(topLeft.X),
+            static_cast<REAL>(topLeft.Y),
+            static_cast<REAL>(width),
+            static_cast<REAL>(height)
+        );
     }
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }
-

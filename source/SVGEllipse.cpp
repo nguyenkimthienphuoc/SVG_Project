@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "SVGEllipse.h"
 
 // function helps double dispatch
@@ -27,6 +27,11 @@ float SVGEllipse::getRx() const { return rx; }
 float SVGEllipse::getRy() const { return ry; }
 
 void SVGEllipse::draw(Gdiplus::Graphics* graphics) const {
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
 
     float left = cx - rx;
     float top = cy - ry;
@@ -54,4 +59,7 @@ void SVGEllipse::draw(Gdiplus::Graphics* graphics) const {
         Pen strokePen(strokeColor, style.strokeWidth);
         graphics->DrawEllipse(&strokePen, left, top, width, height);
     }
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }

@@ -312,6 +312,34 @@ std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 	return points;
 }
 
+
+void SVGParser::parseTransform(SVGElement* element, const std::string& transformStr) {
+	std::stringstream ss(transformStr);
+	std::string token;
+
+	while (std::getline(ss, token, ')')) {
+		if (token.find("translate(") != std::string::npos) {
+			float tx = 0, ty = 0;
+			std::string content = token.substr(token.find('(') + 1);
+			std::stringstream vals(content);
+			std::string xStr, yStr;
+
+			if (std::getline(vals, xStr, ',') && std::getline(vals, yStr, ',')) {
+				tx = std::stof(xStr);
+				ty = std::stof(yStr);
+			}
+			else if (!xStr.empty()) {
+				tx = std::stof(xStr);
+			}
+
+			Gdiplus::Matrix m;
+			m.Translate(tx, ty);
+			element->applyTransform(m);
+		}
+		// TO DO 'scale' and 'rotate'
+	}
+}
+
 SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 {
 	if (!node) return nullptr;
@@ -327,17 +355,26 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 		std::string yStr = extractAttr(node, "y");
 		std::string widthStr = extractAttr(node, "width");
 		std::string heightStr = extractAttr(node, "height");
-		
-		std::cout << "Rect attributes - x:" << xStr << " y:" << yStr << " width:" << widthStr << " height:" << heightStr << std::endl;
-		
+
+		std::cout << "Rect attributes - x:" << xStr << " y:" << yStr
+			<< " width:" << widthStr << " height:" << heightStr << std::endl;
+
 		if (!xStr.empty() && !yStr.empty() && !widthStr.empty() && !heightStr.empty()) {
 			REAL x = static_cast<REAL>(std::stof(xStr));
 			REAL y = static_cast<REAL>(std::stof(yStr));
 			REAL width = static_cast<REAL>(std::stof(widthStr));
 			REAL height = static_cast<REAL>(std::stof(heightStr));
 			PointF topLeft(x, y);
+
+			SVGRect* rect = new SVGRect(topLeft, width, height, s);
+
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(rect, transformStr);
+			}
+
 			std::cout << "Created rect successfully" << std::endl;
-			return new SVGRect(topLeft, width, height, s);
+			return rect;
 		}
 	}
 
@@ -354,10 +391,19 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			float x = std::stof(cxStr);
 			float y = std::stof(cyStr);
 			float radius = std::stof(rStr);
-			PointF topLeft{x, y};
+			PointF topLeft{ x, y };
 			PaintStyle s = parsePaintStyle(node);
+
+			SVGCircle* circle = new SVGCircle(topLeft, radius, s);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(circle, transformStr);
+			}
+
 			std::cout << "Created circle successfully" << std::endl;
-			return new SVGCircle(topLeft, radius, s);
+			return circle;
 		}
 	}
 
@@ -377,8 +423,17 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			float x2 = std::stof(x2Str);
 			float y2 = std::stof(y2Str);
 			PaintStyle s = parsePaintStyle(node);
+
+			SVGLine* line = new SVGLine(x1, x2, y1, y2, s);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(line, transformStr);
+			}
+
 			std::cout << "Created line successfully" << std::endl;
-			return new SVGLine(x1, x2, y1, y2, s);
+			return line;
 		}
 	}
 
@@ -398,8 +453,17 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			float rx = std::stof(rxStr);
 			float ry = std::stof(ryStr);
 			PaintStyle s = parsePaintStyle(node);
+
+			SVGEllipse* ellipse = new SVGEllipse(cx, cy, rx, ry, s);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(ellipse, transformStr);
+			}
+
 			std::cout << "Created ellipse successfully" << std::endl;
-			return new SVGEllipse(cx, cy, rx, ry, s);
+			return ellipse;
 		}
 	}
 
@@ -408,12 +472,23 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 	{
 		std::string pointStr = extractAttr(node, "points");
 		std::cout << "Polygon points: " << pointStr << std::endl;
+
 		if (!pointStr.empty()) {
 			std::vector<PointF> points = parsePoints(pointStr);
 			std::cout << "Parsed " << points.size() << " points for polygon" << std::endl;
+
 			PaintStyle s = parsePaintStyle(node);
+
+			SVGPolygon* polygon = new SVGPolygon(points, s);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(polygon, transformStr);
+			}
+
 			std::cout << "Created polygon successfully" << std::endl;
-			return new SVGPolygon(points, s);
+			return polygon;
 		}
 	}
 
@@ -425,9 +500,19 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 		if (!pointStr.empty()) {
 			std::vector<PointF> points = parsePoints(pointStr);
 			std::cout << "Parsed " << points.size() << " points for polyline" << std::endl;
+
 			PaintStyle s = parsePaintStyle(node);
+
+			SVGPolyline* polyline = new SVGPolyline(points, s);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(polyline, transformStr);
+			}
+
 			std::cout << "Created polyline successfully" << std::endl;
-			return new SVGPolyline(points, s);
+			return polyline;
 		}
 	}
 
@@ -436,11 +521,19 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 	{
 		std::string data = extractAttr(node, "d");
 		std::cout << "Path data: " << data << std::endl;
+
 		if (!data.empty())
 		{
 			PaintStyle style = parsePaintStyle(node);
+			SVGPath* path = new SVGPath(data, style);
+
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(path, transformStr);
+			}
+
 			std::cout << "Created path successfully" << std::endl;
-			return new SVGPath(data, style);
+			return path;
 		}
 	}
 
@@ -461,11 +554,19 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			if (!xStr.empty() && !yStr.empty() && !sizeStr.empty()) {
 				float x = stof(xStr);
 				float y = stof(yStr);
-				PointF startPoint{x, y};
+				PointF startPoint{ x, y };
 				TextPaintStyle t = parseTextStyle(node);
 				float size = stof(sizeStr);
+
+				SVGText* text = new SVGText(content, startPoint, t, size);
+
+				std::string transformStr = extractAttr(node, "transform");
+				if (!transformStr.empty()) {
+					parseTransform(text, transformStr);
+				}
+
 				std::cout << "Created text successfully" << std::endl;
-				return new SVGText(content, startPoint, t, size);
+				return text;
 			}
 		}
 	}

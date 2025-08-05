@@ -11,5 +11,7 @@ public:
    void draw(Graphics* graphics) const override;
    void accept(SVGVisitor* visitor) override;
 
+   // Getter and Setter
    const std::vector<PointF>& getPoints() const { return points; }
+   void setPoints(const std::vector<PointF>& pts) { points = pts; }
 };

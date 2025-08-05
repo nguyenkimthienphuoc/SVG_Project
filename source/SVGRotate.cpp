@@ -7,7 +7,7 @@ void SVGRotate::visit(SVGCircle *circle)
     float radius = circle->getRadius();
     
     // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     float newX = center.X * cos(radian) - center.Y * sin(radian);
     float newY = center.X * sin(radian) + center.Y * cos(radian);
     
@@ -23,7 +23,7 @@ void SVGRotate::visit(SVGRect *rectangle)
     float height = rectangle->height;
 
     // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     float newX = topLeft.X * cos(radian) - topLeft.Y * sin(radian);
     float newY = topLeft.X * sin(radian) + topLeft.Y * cos(radian);
 
@@ -40,7 +40,7 @@ void SVGRotate::visit(SVGLine *line)
     float y2 = line->getter_y2();
 
     // Calculate new positions after rotation
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     float newX1 = x1 * cos(radian) - y1 * sin(radian);
     float newY1 = x1 * sin(radian) + y1 * cos(radian);
     float newX2 = x2 * cos(radian) - y2 * sin(radian);
@@ -58,7 +58,7 @@ void SVGRotate::visit(SVGText *text)
     float size = text->getSize();
 
     // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     float newX = startPoint.X * cos(radian) - startPoint.Y * sin(radian);
     float newY = startPoint.X * sin(radian) + startPoint.Y * cos(radian);
 
@@ -76,7 +76,7 @@ void SVGRotate::visit(SVGEllipse *ellipse)
 
 
     // Calculate new position after rotation
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     float newX = cx * cos(radian) - cy * sin(radian);
     float newY = cx * sin(radian) + cy * cos(radian);
 
@@ -93,24 +93,26 @@ void SVGRotate::visit(SVGPolygon *polygon)
 {
     // Rotate each point of the polygon
     std::vector<PointF> points = polygon->getPoints();
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     
     for (auto& point : points) {
         float newX = point.X * cos(radian) - point.Y * sin(radian);
         float newY = point.X * sin(radian) + point.Y * cos(radian);
         point = PointF(newX, newY);
     }
+    polygon->setPoints(points);
 }
 
 void SVGRotate::visit(SVGPolyline *polyline)
 {
     // Rotate each point of the polyline
     std::vector<PointF> points = polyline->getPoints();
-    float radian = degree * (M_PI / 180.0f);
+    float radian = degree * (pi / 180.0f);
     
     for (auto& point : points) {
         float newX = point.X * cos(radian) - point.Y * sin(radian);
         float newY = point.X * sin(radian) + point.Y * cos(radian);
         point = PointF(newX, newY);
     }
+    polyline->setPoints(points);
 }

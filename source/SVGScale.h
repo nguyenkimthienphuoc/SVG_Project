@@ -12,6 +12,8 @@
 #include "SVGElement.h"
 #include "SVGBasics.h"
 #include <cmath>
+constexpr double pi = 3.14159265358979323846;
+
 class SVGScaleByTimes : public SVGVisitor
 {
 private:

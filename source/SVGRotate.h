@@ -1,5 +1,6 @@
 #ifndef SVGROTATE_H
 #define SVGROTATE_H
+
 #include "SVGVisitor.h"
 #include "SVGCircle.h"
 #include "SVGRect.h"
@@ -12,6 +13,9 @@
 #include "SVGElement.h"
 #include "SVGBasics.h"
 #include <cmath>
+
+constexpr double pi = 3.14159265358979323846;
+
 class SVGRotate : public SVGVisitor
 {
 private:

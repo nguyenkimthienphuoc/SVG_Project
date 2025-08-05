@@ -9,6 +9,7 @@ class SVGEllipse;
 class SVGPath;
 class SVGPolygon;
 class SVGPolyline;
+class SVGGroup;
 
 class SVGVisitor
 {
@@ -21,6 +22,7 @@ public:
     virtual void visit(SVGPath *path) = 0;
     virtual void visit(SVGPolygon* polygon) = 0;
     virtual void visit(SVGPolyline* polyline) = 0;
+	virtual void visit(SVGGroup* group) = 0;
 };
 
 #endif

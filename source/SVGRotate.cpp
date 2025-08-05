@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "SVGRotate.h"
 
 void SVGRotate::visit(SVGCircle *circle)

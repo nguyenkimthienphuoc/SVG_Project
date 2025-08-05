@@ -1,3 +1,4 @@
+#include "stdafx.h"
 #include "SVGScale.h"
 
 // Scale the circle's radius by the given times

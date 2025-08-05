@@ -19,6 +19,7 @@
 #include <string>
 #include <gdiplus.h>
 #include <cstring>
+#include <stack>
 
 using namespace Gdiplus;
 
@@ -36,6 +37,7 @@ private:
    std::vector<SVGElement *> elements;
    rapidxml::xml_document<> doc;
    char* xmlData; // Store XML data for RapidXML
+   std::stack<PaintStyle> paintStyleStack;
 
 public:
    // Constructor and Destructor
@@ -52,6 +54,7 @@ public:
    std::vector<PointF> parsePoints(const std::string& pointStr);
    void parseTransform(SVGElement* element, const std::string& transformStr);
    SVGElement *createElementFromNode(rapidxml::xml_node<>* node);
+   SVGElement* createElementFromNodeWithStyle(rapidxml::xml_node<>* node, const PaintStyle& inheritedStyle);
 
    // Getters
    std::vector<SVGElement*> getElements() const;

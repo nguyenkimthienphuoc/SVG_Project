@@ -34,7 +34,7 @@ class SVGScaleByXY : public SVGVisitor
 {
 private:
     float x;
-    float y
+    float y;
 
 public:
     SVGScaleByXY (float x, float y) : x(x), y(y){}

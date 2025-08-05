@@ -1,5 +1,6 @@
 #pragma once
 #include "SVGElement.h"
+#include "SVGVisitor.h"
 #include <string>
 
 class SVGText : public SVGElement {
@@ -18,6 +19,8 @@ public:
     std::wstring getText() const;
 
     void draw(Graphics* graphics) const override;
+    
+    void accept(SVGVisitor* visitor) override;
 
     // Setter and Getter methods
     Gdiplus::PointF getStartPoint() const { return startPoint; }

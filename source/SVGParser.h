@@ -50,6 +50,7 @@ public:
    PaintStyle parsePaintStyle(rapidxml::xml_node<>* node);
    TextPaintStyle parseTextStyle(rapidxml::xml_node<>* node);
    std::vector<PointF> parsePoints(const std::string& pointStr);
+   void parseTransform(SVGElement* element, const std::string& transformStr);
    SVGElement *createElementFromNode(rapidxml::xml_node<>* node);
 
    // Getters

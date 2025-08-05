@@ -73,3 +73,10 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
     // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);
 }
+
+void SVGText::accept(SVGVisitor* visitor) {
+    // Implementation for visitor pattern
+    if (visitor) {
+        visitor->visit(this);
+    }
+}

@@ -95,27 +95,94 @@ void SVGParser::parseNode(rapidxml::xml_node<>* node)
 	if (!node) return;
 
 	std::string tag = node->name();
+	std::cout << "Processing node: " << tag << std::endl;
+	
 	if (tag == "g") {
 		PaintStyle groupStyle = parsePaintStyle(node);
+		TextPaintStyle groupTextStyle = parseTextStyle(node);
 		SVGGroup* group = new SVGGroup(groupStyle);
+
+		// Apply transform to group if it exists
+		std::string transformStr = extractAttr(node, "transform");
+		if (!transformStr.empty()) {
+			parseTransform(group, transformStr);
+			std::cout << "Applied transform to group: " << transformStr << std::endl;
+		}
+
+		std::cout << "Processing group with " << rapidxml::count_children(node) << " children" << std::endl;
 
 		// Lưu stack
 		paintStyleStack.push(groupStyle);
+		textStyleStack.push(groupTextStyle);
+		
+		int childCount = 0;
 		for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
-			SVGElement* childElement = createElementFromNodeWithStyle(child, groupStyle);
-			if (childElement) group->addChild(childElement);
+			std::string childTag = child->name();
+			std::cout << "Processing group child: " << childTag << std::endl;
+			SVGElement* childElement = nullptr;
+			
+			if (childTag == "text") {
+				// For text elements, use text style inheritance
+				childElement = createTextFromNodeWithStyle(child, groupTextStyle);
+			} else if (childTag == "g") {
+				// Nested group - create a temporary parser state
+				SVGGroup* nestedGroup = nullptr;
+				
+				// Parse nested group as a separate element
+				PaintStyle nestedGroupStyle = parsePaintStyle(child);
+				TextPaintStyle nestedGroupTextStyle = parseTextStyle(child);
+				nestedGroup = new SVGGroup(nestedGroupStyle);
+				
+				// Apply transform to nested group if it exists
+				std::string nestedTransformStr = extractAttr(child, "transform");
+				if (!nestedTransformStr.empty()) {
+					parseTransform(nestedGroup, nestedTransformStr);
+					std::cout << "Applied transform to nested group: " << nestedTransformStr << std::endl;
+				}
+				
+				// Process children of nested group
+				for (rapidxml::xml_node<>* grandChild = child->first_node(); grandChild; grandChild = grandChild->next_sibling()) {
+					std::string grandChildTag = grandChild->name();
+					SVGElement* grandChildElement = nullptr;
+					
+					if (grandChildTag == "text") {
+						grandChildElement = createTextFromNodeWithStyle(grandChild, nestedGroupTextStyle);
+					} else {
+						grandChildElement = createElementFromNodeWithStyle(grandChild, nestedGroupStyle);
+					}
+					
+					if (grandChildElement) {
+						nestedGroup->addChild(grandChildElement);
+						std::cout << "Added grandchild element to nested group" << std::endl;
+					}
+				}
+				
+				childElement = nestedGroup;
+			} else {
+				// For other elements, use regular style inheritance
+				childElement = createElementFromNodeWithStyle(child, groupStyle);
+			}
+			
+			if (childElement) {
+				group->addChild(childElement);
+				childCount++;
+				std::cout << "Added child element to group" << std::endl;
+			}
 		}
+		
+		textStyleStack.pop();
 		paintStyleStack.pop();
 
+		std::cout << "Group processed with " << childCount << " children" << std::endl;
 		elements.push_back(group);
 	}
 	else {
 		SVGElement* element = createElementFromNode(node);
-		if (element) elements.push_back(element);
-	}
+		if (element) {
+			elements.push_back(element);
+		}
 
-	// Đệ quy nếu cần (trừ khi đã xử lý qua SVGGroup rồi)
-	if (tag != "g") {
+		// Process children for non-group elements if any
 		for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
 			parseNode(child);
 		}
@@ -159,18 +226,77 @@ Color SVGParser::parseColor(const std::string &colorStr)
 		}
 	}
 
-	// 2. Check for simple color format
+	// 2. Check for hex color format (#RRGGBB or #RGB)
+	if (colorStr.length() > 1 && colorStr[0] == '#') {
+		std::string hex = colorStr.substr(1);
+		if (hex.length() == 6) {
+			// #RRGGBB format
+			int r = std::stoi(hex.substr(0, 2), nullptr, 16);
+			int g = std::stoi(hex.substr(2, 2), nullptr, 16);
+			int b = std::stoi(hex.substr(4, 2), nullptr, 16);
+			return Color(255, r, g, b);
+		}
+		else if (hex.length() == 3) {
+			// #RGB format - expand to #RRGGBB
+			int r = std::stoi(std::string(2, hex[0]), nullptr, 16);
+			int g = std::stoi(std::string(2, hex[1]), nullptr, 16);
+			int b = std::stoi(std::string(2, hex[2]), nullptr, 16);
+			return Color(255, r, g, b);
+		}
+	}
+
+	// 3. Check for "none" value first
+	if (colorStr == "none")
+		return Gdiplus::Color(0, 0, 0, 0); // Transparent
+
+	// 4. Check for named colors
 	if (colorStr == "red")
 		return Gdiplus::Color(255, 255, 0, 0);
-	if (colorStr == "blue")
-		return Gdiplus::Color(255, 0, 0, 255);
 	if (colorStr == "green")
 		return Gdiplus::Color(255, 0, 128, 0);
+	if (colorStr == "blue")
+		return Gdiplus::Color(255, 0, 0, 255);
+	if (colorStr == "yellow")
+		return Gdiplus::Color(255, 255, 255, 0);
+	if (colorStr == "orange")
+		return Gdiplus::Color(255, 255, 165, 0);
+	if (colorStr == "purple")
+		return Gdiplus::Color(255, 128, 0, 128);
+	if (colorStr == "pink")
+		return Gdiplus::Color(255, 255, 192, 203);
+	if (colorStr == "cyan")
+		return Gdiplus::Color(255, 0, 255, 255);
+	if (colorStr == "magenta")
+		return Gdiplus::Color(255, 255, 0, 255);
+	if (colorStr == "lime")
+		return Gdiplus::Color(255, 0, 255, 0);
+	if (colorStr == "brown")
+		return Gdiplus::Color(255, 165, 42, 42);
+	if (colorStr == "gray" || colorStr == "grey")
+		return Gdiplus::Color(255, 128, 128, 128);
 	if (colorStr == "black")
 		return Gdiplus::Color(255, 0, 0, 0);
 	if (colorStr == "white")
 		return Gdiplus::Color(255, 255, 255, 255);
+	if (colorStr == "darkred")
+		return Gdiplus::Color(255, 139, 0, 0);
+	if (colorStr == "darkgreen")
+		return Gdiplus::Color(255, 0, 100, 0);
+	if (colorStr == "darkblue")
+		return Gdiplus::Color(255, 0, 0, 139);
+	if (colorStr == "lightred")
+		return Gdiplus::Color(255, 255, 182, 193);
+	if (colorStr == "lightgreen")
+		return Gdiplus::Color(255, 144, 238, 144);
+	if (colorStr == "lightblue")
+		return Gdiplus::Color(255, 173, 216, 230);
+	if (colorStr == "gold")
+		return Gdiplus::Color(255, 255, 215, 0);
+	if (colorStr == "silver")
+		return Gdiplus::Color(255, 192, 192, 192);
 
+	// Default to black if color not recognized
+	std::cout << "Warning: Unknown color '" << colorStr << "', using black" << std::endl;
 	return Gdiplus::Color(255, 0, 0, 0);
 }
 
@@ -230,6 +356,32 @@ PaintStyle mergePaintStyle(const PaintStyle& parent, const PaintStyle& child) {
 	return result;
 }
 
+TextPaintStyle mergeTextStyle(const TextPaintStyle& parent, const TextPaintStyle& child) {
+	TextPaintStyle result = child;
+
+	// Inherit from parent if child doesn't have specific values
+	if (child.fontSize == 16.0f) result.fontSize = parent.fontSize; // Use parent font size if child is default
+	if (child.fontFamily == "Arial") result.fontFamily = parent.fontFamily;
+	if (child.fontWeight == "normal") result.fontWeight = parent.fontWeight;
+	if (child.fontStyle == "normal") result.fontStyle = parent.fontStyle;
+	if (child.textAnchor == "start") result.textAnchor = parent.textAnchor;
+	if (child.dx == 0.0f) result.dx = parent.dx;
+	if (child.dy == 0.0f) result.dy = parent.dy;
+
+	// Merge colors if child is default
+	if (child.fillColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
+		result.fillColor = parent.fillColor;
+	if (child.strokeColor.GetValue() == Gdiplus::Color(0, 0, 0, 0).GetValue())
+		result.strokeColor = parent.strokeColor;
+
+	// Opacity inheritance
+	if (child.fillOpacity == 1.0f) result.fillOpacity *= parent.fillOpacity;
+	if (child.strokeOpacity == 1.0f) result.strokeOpacity *= parent.strokeOpacity;
+	if (child.strokeWidth == 0.0f) result.strokeWidth = parent.strokeWidth;
+
+	return result;
+}
+
 TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
 {
 	TextPaintStyle t;
@@ -268,9 +420,24 @@ TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
 		t.fontWeight = fontW;
 	}
 
+	if (std::string fontSize_str = (extractAttr(node, "font-size")); !fontSize_str.empty())
+	{
+		t.fontSize = std::stof(fontSize_str);
+	}
+
 	if (std::string textA = (extractAttr(node, "text-anchor")); !textA.empty())
 	{
 		t.textAnchor = textA;
+	}
+
+	if (std::string dx_str = (extractAttr(node, "dx")); !dx_str.empty())
+	{
+		t.dx = std::stof(dx_str);
+	}
+
+	if (std::string dy_str = (extractAttr(node, "dy")); !dy_str.empty())
+	{
+		t.dy = std::stof(dy_str);
 	}
 
 	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())
@@ -324,26 +491,62 @@ std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 
 
 void SVGParser::parseTransform(SVGElement* element, const std::string& transformStr) {
-	std::stringstream ss(transformStr);
-	std::string token;
 	std::cout << "Parsing transform: " << transformStr << std::endl;
-
-	while (std::getline(ss, token, ')')) {
-		// Clean whitespace
-		token.erase(0, token.find_first_not_of(" \t"));
-		token.erase(token.find_last_not_of(" \t") + 1);
+	
+	// Split transforms by looking for transform functions
+	std::string str = transformStr;
+	size_t pos = 0;
+	
+	while (pos < str.length()) {
+		// Find the next transform function
+		size_t translatePos = str.find("translate(", pos);
+		size_t rotatePos = str.find("rotate(", pos);
+		size_t scalePos = str.find("scale(", pos);
 		
-		if (token.find("translate(") != std::string::npos) {
+		// Find the earliest position
+		size_t nextPos = std::string::npos;
+		std::string transformType = "";
+		
+		if (translatePos != std::string::npos) {
+			nextPos = translatePos;
+			transformType = "translate";
+		}
+		if (rotatePos != std::string::npos && (nextPos == std::string::npos || rotatePos < nextPos)) {
+			nextPos = rotatePos;
+			transformType = "rotate";
+		}
+		if (scalePos != std::string::npos && (nextPos == std::string::npos || scalePos < nextPos)) {
+			nextPos = scalePos;
+			transformType = "scale";
+		}
+		
+		if (nextPos == std::string::npos) break;
+		
+		// Find the closing parenthesis
+		size_t openParen = str.find('(', nextPos);
+		size_t closeParen = str.find(')', openParen);
+		
+		if (openParen == std::string::npos || closeParen == std::string::npos) break;
+		
+		// Extract the content between parentheses
+		std::string content = str.substr(openParen + 1, closeParen - openParen - 1);
+		
+		if (transformType == "translate") {
 			float tx = 0, ty = 0;
-			std::string content = token.substr(token.find('(') + 1);
+			
+			// Replace commas with spaces to handle both formats
+			for (char& c : content) {
+				if (c == ',') c = ' ';
+			}
+			
 			std::stringstream vals(content);
 			std::string xStr, yStr;
 
-			if (std::getline(vals, xStr, ',') && std::getline(vals, yStr, ',')) {
+			if (vals >> xStr >> yStr) {
 				tx = std::stof(xStr);
 				ty = std::stof(yStr);
 			}
-			else if (!xStr.empty()) {
+			else if (vals >> xStr) {
 				tx = std::stof(xStr);
 			}
 
@@ -352,14 +555,12 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 			element->accept(&translateVisitor);
 			std::cout << "Applied translate(" << tx << ", " << ty << ")" << std::endl;
 		}
-		else if (token.find("rotate(") != std::string::npos) {
+		else if (transformType == "rotate") {
 			float degree = 0;
-			std::string content = token.substr(token.find('(') + 1);
 			
-			// Parse rotate(angle)
 			std::stringstream vals(content);
 			std::string angleStr;
-			if (std::getline(vals, angleStr, ',')) {
+			if (vals >> angleStr) {
 				degree = std::stof(angleStr);
 			}
 			
@@ -368,13 +569,18 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 			element->accept(&rotateVisitor);
 			std::cout << "Applied rotate(" << degree << ")" << std::endl;
 		}
-		else if (token.find("scale(") != std::string::npos) {
+		else if (transformType == "scale") {
 			float sx = 1, sy = 1;
-			std::string content = token.substr(token.find('(') + 1);
+			
+			// Replace commas with spaces to handle both formats
+			for (char& c : content) {
+				if (c == ',') c = ' ';
+			}
+			
 			std::stringstream vals(content);
 			std::string xStr, yStr;
 
-			if (std::getline(vals, xStr, ',') && std::getline(vals, yStr, ',')) {
+			if (vals >> xStr >> yStr) {
 				sx = std::stof(xStr);
 				sy = std::stof(yStr);
 				// Apply XY scaling using visitor pattern
@@ -382,7 +588,7 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 				element->accept(&scaleVisitor);
 				std::cout << "Applied scale(" << sx << ", " << sy << ")" << std::endl;
 			}
-			else if (!xStr.empty()) {
+			else if (vals >> xStr) {
 				sx = std::stof(xStr);
 				// Apply uniform scaling using visitor pattern
 				SVGScaleByTimes scaleVisitor(sx);
@@ -390,6 +596,9 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 				std::cout << "Applied scale(" << sx << ")" << std::endl;
 			}
 		}
+		
+		// Move to the next position after this transform
+		pos = closeParen + 1;
 	}
 }
 
@@ -864,6 +1073,59 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 	}
 
 	std::cout << "No element created for: " << nodeName << std::endl;
+	return nullptr;
+}
+
+SVGElement* SVGParser::createTextFromNodeWithStyle(rapidxml::xml_node<>* node, const TextPaintStyle& inheritedTextStyle)
+{
+	if (!node) return nullptr;
+
+	std::string nodeName = node->name();
+	std::cout << "Creating text element for: " << nodeName << std::endl;
+
+	if (nodeName == "text") {
+		std::wstring content = extractText(node);
+		std::cout << "Text content length: " << content.length() << std::endl;
+
+		if (!content.empty()) {
+			std::string xStr = extractAttr(node, "x");
+			std::string yStr = extractAttr(node, "y");
+			
+			std::cout << "Text attributes - x:" << xStr << " y:" << yStr << " inherited-font-size:" << inheritedTextStyle.fontSize << std::endl;
+			
+			if (!xStr.empty() && !yStr.empty()) {
+				float x = stof(xStr);
+				float y = stof(yStr);
+				PointF startPoint{ x, y };
+				
+				// Parse local text style and merge with inherited
+				TextPaintStyle localTextStyle = parseTextStyle(node);
+				
+				// Check if local element has font-size attribute
+				std::string localFontSizeStr = extractAttr(node, "font-size");
+				float fontSize = localFontSizeStr.empty() ? inheritedTextStyle.fontSize : std::stof(localFontSizeStr);
+				
+				std::cout << "Local font-size attribute: '" << localFontSizeStr << "'" << std::endl;
+				std::cout << "Final fontSize will be: " << fontSize << std::endl;
+				
+				// Merge text styles (but font size is handled separately above)
+				TextPaintStyle finalTextStyle = mergeTextStyle(inheritedTextStyle, localTextStyle);
+				finalTextStyle.fontSize = fontSize; // Override with correct font size
+
+				SVGText* text = new SVGText(content, startPoint, finalTextStyle, fontSize);
+
+				std::string transformStr = extractAttr(node, "transform");
+				if (!transformStr.empty()) {
+					parseTransform(text, transformStr);
+				}
+
+				std::cout << "Created text successfully with font-size: " << fontSize << std::endl;
+				return text;
+			}
+		}
+	}
+
+	std::cout << "No text element created for: " << nodeName << std::endl;
 	return nullptr;
 }
 

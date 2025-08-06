@@ -32,23 +32,14 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
     // Áp dụng transform nếu có
     graphics->MultiplyTransform(&getTransform());
 
-    Gdiplus::SolidBrush brush(style.fillColor);
-
     Gdiplus::FontFamily fontFamily(L"Arial");
     Gdiplus::Font font(&fontFamily, fontSize, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 
     Gdiplus::StringFormat stringFormat;
     stringFormat.SetAlignment(Gdiplus::StringAlignmentNear);
 
-    // Lưu ý về hệ trục tọa độ:
-    // Trong SVG: (x, y) là vị trí baseline (dưới cùng) của text.
-    // Trong GDI+: (x, y) là top-left corner của text bounding box.
-    // Vì vậy, nếu ta dùng trực tiếp (x, y), text sẽ bị thấp hơn dự kiến (do chiều dương hướng xuống).
-    // Giải pháp: tính chiều cao dòng chữ, rồi dịch text lên (tức là trừ bớt y) một đoạn tương ứng.
-
-    Gdiplus::RectF layoutRect;
-
     // Tính chiều cao văn bản
+    Gdiplus::RectF layoutRect;
     graphics->MeasureString(
         textContent.c_str(),
         -1,
@@ -58,17 +49,39 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
         &layoutRect
     );
 
-    // Dịch text lên (trừ bớt y) theo layoutRect.Height
-    float adjustedY = startPoint.Y - layoutRect.Height;
+    // Apply dx and dy offsets
+    float finalX = startPoint.X + style.dx;
+    float finalY = startPoint.Y + style.dy;
 
-    graphics->DrawString(
-        textContent.c_str(),
-        -1,
-        &font,
-        Gdiplus::PointF(startPoint.X, adjustedY),
-        &stringFormat,
-        &brush
-    );
+    // Dịch text lên (trừ bớt y) theo layoutRect.Height
+    float adjustedY = finalY - layoutRect.Height;
+
+    // Apply text-anchor alignment
+    if (style.textAnchor == "middle") {
+        finalX -= layoutRect.Width / 2;
+    } else if (style.textAnchor == "end") {
+        finalX -= layoutRect.Width;
+    }
+
+    // Draw fill if not transparent
+    if (style.fillColor.GetA() > 0) {
+        Gdiplus::SolidBrush brush(style.fillColor);
+        graphics->DrawString(
+            textContent.c_str(),
+            -1,
+            &font,
+            Gdiplus::PointF(finalX, adjustedY),
+            &stringFormat,
+            &brush
+        );
+    }
+
+    // Draw stroke if not transparent and stroke width > 0
+    if (style.strokeColor.GetA() > 0 && style.strokeWidth > 0) {
+        Gdiplus::Pen pen(style.strokeColor, style.strokeWidth);
+        // Note: GDI+ doesn't have direct text stroke, we would need to use GraphicsPath
+        // For simplicity, we'll skip stroke on text for now unless specifically needed
+    }
 
     // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);

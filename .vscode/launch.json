@@ -8,8 +8,8 @@
       "args": [],
       "stopAtEntry": false,
       "externalConsole": true,
-      "cwd": "c:/Users/ADMIN/Desktop/Repo/SVG_Project/SVGDemo",
-      "program": "c:/Users/ADMIN/Desktop/Repo/SVG_Project/SVGDemo/build/Debug/outDebug",
+      "cwd": "d:/HCMUS/Semester 3/OOP/SVG_Project/source",
+      "program": "d:/HCMUS/Semester 3/OOP/SVG_Project/source/build/Debug/outDebug",
       "MIMode": "gdb",
       "miDebuggerPath": "gdb",
       "setupCommands": [

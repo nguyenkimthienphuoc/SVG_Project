@@ -32,13 +32,36 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
     // Áp dụng transform nếu có
     graphics->MultiplyTransform(&getTransform());
 
+    // Apply dx, dy offsets to position
+    float finalX = startPoint.X + style.dx;
+    float finalY = startPoint.Y + style.dy;
+
     Gdiplus::SolidBrush brush(style.fillColor);
 
-    Gdiplus::FontFamily fontFamily(L"Arial");
-    Gdiplus::Font font(&fontFamily, fontSize, Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+    // Font setup with style support
+    // Convert string to wstring for font family
+    std::wstring fontFamilyName(style.fontFamily.begin(), style.fontFamily.end());
+    Gdiplus::FontFamily fontFamily(fontFamilyName.c_str());
+    
+    int fontStyle = Gdiplus::FontStyleRegular;
+    if (style.fontStyle == "italic") {
+        fontStyle |= Gdiplus::FontStyleItalic;
+    }
+    if (style.fontWeight == "bold") {
+        fontStyle |= Gdiplus::FontStyleBold;
+    }
+    
+    Gdiplus::Font font(&fontFamily, fontSize, fontStyle, Gdiplus::UnitPixel);
 
+    // Text anchor alignment
     Gdiplus::StringFormat stringFormat;
-    stringFormat.SetAlignment(Gdiplus::StringAlignmentNear);
+    if (style.textAnchor == "middle") {
+        stringFormat.SetAlignment(Gdiplus::StringAlignmentCenter);
+    } else if (style.textAnchor == "end") {
+        stringFormat.SetAlignment(Gdiplus::StringAlignmentFar);
+    } else { // "start" or default
+        stringFormat.SetAlignment(Gdiplus::StringAlignmentNear);
+    }
 
     // Lưu ý về hệ trục tọa độ:
     // Trong SVG: (x, y) là vị trí baseline (dưới cùng) của text.
@@ -53,19 +76,19 @@ void SVGText::draw(Gdiplus::Graphics* graphics) const {
         textContent.c_str(),
         -1,
         &font,
-        Gdiplus::PointF(startPoint.X, startPoint.Y),
+        Gdiplus::PointF(finalX, finalY),
         &stringFormat,
         &layoutRect
     );
 
     // Dịch text lên (trừ bớt y) theo layoutRect.Height
-    float adjustedY = startPoint.Y - layoutRect.Height;
+    float adjustedY = finalY - layoutRect.Height;
 
     graphics->DrawString(
         textContent.c_str(),
         -1,
         &font,
-        Gdiplus::PointF(startPoint.X, adjustedY),
+        Gdiplus::PointF(finalX, adjustedY),
         &stringFormat,
         &brush
     );

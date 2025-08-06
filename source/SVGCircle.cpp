@@ -32,7 +32,7 @@ void SVGCircle::draw(Gdiplus::Graphics* graphics) const {
     float diameter = radius * 2;
 
     // Fill circle
-    if (style.fillOpacity > 0.0f) {
+    if (style.fillOpacity > 0.0f && style.fillColor.GetA() > 0) {
         BYTE fillAlpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
         Color fillColor(fillAlpha,
             style.fillColor.GetR(),

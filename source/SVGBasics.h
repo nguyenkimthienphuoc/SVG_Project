@@ -31,6 +31,10 @@ struct TextPaintStyle {
     // Căn lề văn bản
     std::string textAnchor = "start";          // start | middle | end
 
+    // Text positioning offsets
+    float dx = 0.0f;                           // horizontal offset
+    float dy = 0.0f;                           // vertical offset
+
     // Tùy chọn khác
     float opacity = 1.0f;                      // độ trong suốt tổng thể
 };

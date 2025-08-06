@@ -28,8 +28,8 @@ void SVGRect::draw(Graphics* graphics) const {
     // Áp dụng transform nếu có
     graphics->MultiplyTransform(&getTransform());
 
-    // Vẽ phần Fill (nếu có)
-    if (style.fillOpacity > 0.0f) {
+    // Vẽ phần Fill (nếu có alpha > 0 - không phải "none")
+    if (style.fillOpacity > 0.0f && style.fillColor.GetA() > 0) {
         BYTE alpha = static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA());
         Color fillColor(
             alpha,
@@ -48,8 +48,8 @@ void SVGRect::draw(Graphics* graphics) const {
         );
     }
 
-    // Vẽ phần Stroke (nếu có)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
+    // Vẽ phần Stroke (nếu có alpha > 0 và width > 0)
+    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f && style.strokeColor.GetA() > 0) {
         BYTE alpha = static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA());
         Color strokeColor(
             alpha,

@@ -31,8 +31,8 @@ void SVGPolyline::draw(Graphics* graphics) const {
         arr[i] = points[i];
     }
 
-    // 1. Fill (nếu có fillOpacity > 0)
-    if (style.fillOpacity > 0.0f) {
+    // 1. Fill (nếu có alpha > 0 - không phải "none")
+    if (style.fillOpacity > 0.0f && style.fillColor.GetA() > 0) {
         // Tạo màu với alpha
         BYTE alpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
         Color fillColor(alpha,
@@ -45,8 +45,8 @@ void SVGPolyline::draw(Graphics* graphics) const {
         graphics->FillPolygon(&brush, arr.get(), count);
     }
 
-    // 2. Stroke (nếu cần)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
+    // 2. Stroke (nếu có alpha > 0 và width > 0)
+    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f && style.strokeColor.GetA() > 0) {
         BYTE alpha = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
         Color strokeColor(alpha,
             style.strokeColor.GetR(),

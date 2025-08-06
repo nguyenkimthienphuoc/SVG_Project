@@ -159,19 +159,51 @@ Color SVGParser::parseColor(const std::string &colorStr)
 		}
 	}
 
-	// 2. Check for simple color format
-	if (colorStr == "red")
-		return Gdiplus::Color(255, 255, 0, 0);
-	if (colorStr == "blue")
-		return Gdiplus::Color(255, 0, 0, 255);
-	if (colorStr == "green")
-		return Gdiplus::Color(255, 0, 128, 0);
-	if (colorStr == "black")
-		return Gdiplus::Color(255, 0, 0, 0);
-	if (colorStr == "white")
-		return Gdiplus::Color(255, 255, 255, 255);
+	// 2. Check for hex format (#RRGGBB or #RGB)
+	if (colorStr[0] == '#') {
+		std::string hex = colorStr.substr(1);
+		if (hex.length() == 6) {
+			// #RRGGBB format
+			int r = std::stoi(hex.substr(0, 2), nullptr, 16);
+			int g = std::stoi(hex.substr(2, 2), nullptr, 16);
+			int b = std::stoi(hex.substr(4, 2), nullptr, 16);
+			return Color(255, r, g, b);
+		}
+		else if (hex.length() == 3) {
+			// #RGB format - expand to #RRGGBB
+			int r = std::stoi(hex.substr(0, 1) + hex.substr(0, 1), nullptr, 16);
+			int g = std::stoi(hex.substr(1, 1) + hex.substr(1, 1), nullptr, 16);
+			int b = std::stoi(hex.substr(2, 1) + hex.substr(2, 1), nullptr, 16);
+			return Color(255, r, g, b);
+		}
+	}
 
-	return Gdiplus::Color(255, 0, 0, 0);
+	// 3. Check for named colors
+	if (colorStr == "red") return Color(255, 255, 0, 0);
+	if (colorStr == "blue") return Color(255, 0, 0, 255);
+	if (colorStr == "green") return Color(255, 0, 128, 0);
+	if (colorStr == "black") return Color(255, 0, 0, 0);
+	if (colorStr == "white") return Color(255, 255, 255, 255);
+	if (colorStr == "yellow") return Color(255, 255, 255, 0);
+	if (colorStr == "cyan") return Color(255, 0, 255, 255);
+	if (colorStr == "magenta") return Color(255, 255, 0, 255);
+	if (colorStr == "gray" || colorStr == "grey") return Color(255, 128, 128, 128);
+	if (colorStr == "orange") return Color(255, 255, 165, 0);
+	if (colorStr == "purple") return Color(255, 128, 0, 128);
+	if (colorStr == "brown") return Color(255, 165, 42, 42);
+	if (colorStr == "pink") return Color(255, 255, 192, 203);
+	if (colorStr == "navy") return Color(255, 0, 0, 128);
+	if (colorStr == "darkmagenta") return Color(255, 139, 0, 139);
+	if (colorStr == "midnightblue") return Color(255, 25, 25, 112);
+	if (colorStr == "darkslategray") return Color(255, 47, 79, 79);
+	if (colorStr == "deepskyblue") return Color(255, 0, 191, 255);
+	if (colorStr == "blueviolet") return Color(255, 138, 43, 226);
+	if (colorStr == "skyblue") return Color(255, 135, 206, 235);
+
+	// 4. Special values
+	if (colorStr == "none") return Color(0, 0, 0, 0);  // Transparent
+
+	return Color(255, 0, 0, 0);  // Default black
 }
 
 PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
@@ -255,7 +287,7 @@ TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
 
 	if (std::string strokeO = (extractAttr(node, "stroke-opacity")); !strokeO.empty())
 	{
-		t.strokeWidth = std::stof(strokeO);
+		t.strokeOpacity = std::stof(strokeO);
 	}
 
 	if (std::string fontFam = (extractAttr(node, "font-family")); !fontFam.empty())
@@ -268,9 +300,24 @@ TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
 		t.fontWeight = fontW;
 	}
 
+	if (std::string fontS = (extractAttr(node, "font-style")); !fontS.empty())
+	{
+		t.fontStyle = fontS;
+	}
+
 	if (std::string textA = (extractAttr(node, "text-anchor")); !textA.empty())
 	{
 		t.textAnchor = textA;
+	}
+
+	if (std::string dxStr = (extractAttr(node, "dx")); !dxStr.empty())
+	{
+		t.dx = std::stof(dxStr);
+	}
+
+	if (std::string dyStr = (extractAttr(node, "dy")); !dyStr.empty())
+	{
+		t.dy = std::stof(dyStr);
 	}
 
 	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())

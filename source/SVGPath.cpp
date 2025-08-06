@@ -1,6 +1,10 @@
 ﻿#include "stdafx.h"
 #include <algorithm>
 #include <iostream>
+#include <cmath>
+
+using namespace std;
+using namespace Gdiplus;
 
 // Function helps double dispatch
 void SVGPath::accept(SVGVisitor* visitor){
@@ -12,6 +16,12 @@ SVGPath::SVGPath(const std::string& data, const PaintStyle& style) : pathData(da
 }
 void SVGPath::draw(Graphics* graphics) const {
     if (!graphics) return;
+
+    // Save graphics state
+    GraphicsState state = graphics->Save();
+    
+    // Apply transform
+    graphics->MultiplyTransform(&getTransform());
 
     // Preprocess path data to handle SVG format properly
     std::string processedData = pathData;
@@ -157,21 +167,96 @@ void SVGPath::draw(Graphics* graphics) const {
             prevCommand = upperCmd;
             break;
         }
+        case 'A': { // Arc
+            float rx, ry, xAxisRotation, largeArcFlag, sweepFlag;
+            ss >> rx >> ry >> xAxisRotation >> largeArcFlag >> sweepFlag >> x >> y;
+            
+            end = isRelative ? Gdiplus::PointF(currentPoint.X + x, currentPoint.Y + y) : Gdiplus::PointF(x, y);
+            
+            // Convert SVG arc to GDI+ using proper arc implementation
+            if (rx > 0 && ry > 0 && (currentPoint.X != end.X || currentPoint.Y != end.Y)) {
+                // Convert rotation angle to radians
+                float phi = xAxisRotation * 3.14159f / 180.0f;
+                
+                // Calculate center point and angles using SVG arc equations
+                float dx = (currentPoint.X - end.X) / 2.0f;
+                float dy = (currentPoint.Y - end.Y) / 2.0f;
+                
+                // Rotate by -phi
+                float x1_prime = cos(phi) * dx + sin(phi) * dy;
+                float y1_prime = -sin(phi) * dx + cos(phi) * dy;
+                
+                // Ensure rx, ry are large enough
+                float lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
+                if (lambda > 1) {
+                    rx *= sqrt(lambda);
+                    ry *= sqrt(lambda);
+                }
+                
+                // Calculate center
+                float sign = (largeArcFlag == sweepFlag) ? -1.0f : 1.0f;
+                float sq = max(0.0f, (rx * rx * ry * ry - rx * rx * y1_prime * y1_prime - ry * ry * x1_prime * x1_prime) / 
+                                     (rx * rx * y1_prime * y1_prime + ry * ry * x1_prime * x1_prime));
+                float coeff = sign * sqrt(sq);
+                
+                float cx_prime = coeff * (rx * y1_prime / ry);
+                float cy_prime = coeff * -(ry * x1_prime / rx);
+                
+                // Transform back to original coordinate system
+                float cx = cos(phi) * cx_prime - sin(phi) * cy_prime + (currentPoint.X + end.X) / 2.0f;
+                float cy = sin(phi) * cx_prime + cos(phi) * cy_prime + (currentPoint.Y + end.Y) / 2.0f;
+                
+                // For GDI+, use AddArc with bounding rectangle
+                float left = cx - rx;
+                float top = cy - ry;
+                float width = 2 * rx;
+                float height = 2 * ry;
+                
+                // Calculate start and sweep angles
+                float startAngle = atan2((currentPoint.Y - cy) / ry, (currentPoint.X - cx) / rx) * 180.0f / 3.14159f;
+                float endAngle = atan2((end.Y - cy) / ry, (end.X - cx) / rx) * 180.0f / 3.14159f;
+                
+                float sweepAngle = endAngle - startAngle;
+                if (sweepFlag == 0 && sweepAngle > 0) sweepAngle -= 360;
+                if (sweepFlag == 1 && sweepAngle < 0) sweepAngle += 360;
+                
+                // Add arc to path
+                gp.AddArc(left, top, width, height, startAngle, sweepAngle);
+            } else {
+                // Fallback to line if arc parameters are invalid
+                gp.AddLine(currentPoint, end);
+            }
+            
+            currentPoint = end;
+            prevCommand = upperCmd;
+            break;
+        }
+        
+        // Update prevCommand for next iteration if not set by specific command
+        if (prevCommand != upperCmd) {
+            prevCommand = upperCmd;
+        }
     }
-}
 
-    // Fill and stroke
-    SolidBrush fillBrush(Color(
-        static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA()),
+    // Fill and stroke with proper namespace
+    Gdiplus::SolidBrush fillBrush(Gdiplus::Color(
+        static_cast<BYTE>(style.fillColor.GetA()),
         style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB()));
 
-    Pen strokePen(Color(
-        static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA()),
+    Gdiplus::Pen strokePen(Gdiplus::Color(
+        static_cast<BYTE>(style.strokeColor.GetA()),
         style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB()),
         style.strokeWidth);
 
-    if (style.fillOpacity > 0)
+    // Use alpha channel to check if fill/stroke should be rendered
+    if (style.fillColor.GetA() > 0) {
         graphics->FillPath(&fillBrush, &gp);
-    if (style.strokeOpacity > 0 && style.strokeWidth > 0)
+    }
+    if (style.strokeColor.GetA() > 0 && style.strokeWidth > 0) {
         graphics->DrawPath(&strokePen, &gp);
+    }
+    
+    // Restore graphics state
+    graphics->Restore(state);
+    }
 }

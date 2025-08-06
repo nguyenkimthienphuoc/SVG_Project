@@ -13,5 +13,5 @@ public:
 
    // Getter and Setter
    const std::vector<PointF>& getPoints() const { return points; }
-   void setPoints(const std::vector<PointF>& pts) { points = pts; }
+   void setPoints(vector<PointF> points) { this->points = points; }
 };

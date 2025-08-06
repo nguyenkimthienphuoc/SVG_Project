@@ -60,6 +60,18 @@
     <ClInclude Include="SVGPath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SVGGroup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SVGRotate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SVGScale.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SVGVisitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -95,6 +107,15 @@
     <ClCompile Include="SVGPath.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SVGGroup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SVGRotate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SVGScale.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SVGDemo.rc">
@@ -108,5 +129,8 @@
     <Image Include="SVGDemo.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="stdafx.pch" />
   </ItemGroup>
 </Project>

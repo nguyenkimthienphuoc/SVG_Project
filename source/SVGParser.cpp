@@ -1,24 +1,4 @@
 ﻿#include "stdafx.h"
-#include "SVGParser.h"
-#include "SVGRect.h"
-#include "SVGCircle.h"
-#include "SVGLine.h"
-#include "SVGBasics.h"
-#include "SVGEllipse.h"
-#include "SVGText.h"
-#include "SVGPolygon.h"
-#include "SVGPolyline.h"
-#include "SVGPath.h"
-#include "../rapidxml/rapidxml.hpp"
-#include <windows.h>
-#include <objidl.h>
-#include <gdiplus.h>
-#include <fstream>
-#include <sstream>
-#include <cstring>
-#include <iostream>
-#include <vector>
-#include <algorithm>
 
 std::string readSVGFile(const std::string &filePath)
 {
@@ -113,23 +93,35 @@ void SVGParser::parseSVG()
 void SVGParser::parseNode(rapidxml::xml_node<>* node)
 {
 	if (!node) return;
-	
-	std::cout << "Parsing node: " << node->name() << std::endl;
-	
-	// Tạo element từ node hiện tại
-	SVGElement* element = createElementFromNode(node);
-	if (element) {
-		this->elements.push_back(element);
-		std::cout << "Successfully created element for: " << node->name() << std::endl;
-	} else {
-		std::cout << "Failed to create element for: " << node->name() << std::endl;
+
+	std::string tag = node->name();
+	if (tag == "g") {
+		PaintStyle groupStyle = parsePaintStyle(node);
+		SVGGroup* group = new SVGGroup(groupStyle);
+
+		// Lưu stack
+		paintStyleStack.push(groupStyle);
+		for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
+			SVGElement* childElement = createElementFromNodeWithStyle(child, groupStyle);
+			if (childElement) group->addChild(childElement);
+		}
+		paintStyleStack.pop();
+
+		elements.push_back(group);
 	}
-	
-	// Đệ quy xử lý các child nodes (hierarchical structure)
-	for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
-		parseNode(child);
+	else {
+		SVGElement* element = createElementFromNode(node);
+		if (element) elements.push_back(element);
+	}
+
+	// Đệ quy nếu cần (trừ khi đã xử lý qua SVGGroup rồi)
+	if (tag != "g") {
+		for (rapidxml::xml_node<>* child = node->first_node(); child; child = child->next_sibling()) {
+			parseNode(child);
+		}
 	}
 }
+
 
 void SVGParser::parseHeader()
 {
@@ -218,6 +210,24 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 	}
 
 	return s;
+}
+
+PaintStyle mergePaintStyle(const PaintStyle& parent, const PaintStyle& child) {
+	PaintStyle result = child;
+
+	// Ưu tiên thuộc tính của con nếu có
+	if (child.fillOpacity == 1.0f) result.fillOpacity *= parent.fillOpacity;
+	if (child.strokeOpacity == 1.0f) result.strokeOpacity *= parent.strokeOpacity;
+
+	if (child.strokeWidth == 1.0f) result.strokeWidth = parent.strokeWidth;
+
+	// Gộp màu (nếu màu con mặc định là đen - tức không set)
+	if (child.fillColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
+		result.fillColor = parent.fillColor;
+	if (child.strokeColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
+		result.strokeColor = parent.strokeColor;
+
+	return result;
 }
 
 TextPaintStyle SVGParser::parseTextStyle(rapidxml::xml_node<>* node)
@@ -316,8 +326,13 @@ std::vector<PointF> SVGParser::parsePoints(const std::string &pointStr)
 void SVGParser::parseTransform(SVGElement* element, const std::string& transformStr) {
 	std::stringstream ss(transformStr);
 	std::string token;
+	std::cout << "Parsing transform: " << transformStr << std::endl;
 
 	while (std::getline(ss, token, ')')) {
+		// Clean whitespace
+		token.erase(0, token.find_first_not_of(" \t"));
+		token.erase(token.find_last_not_of(" \t") + 1);
+		
 		if (token.find("translate(") != std::string::npos) {
 			float tx = 0, ty = 0;
 			std::string content = token.substr(token.find('(') + 1);
@@ -332,11 +347,49 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 				tx = std::stof(xStr);
 			}
 
-			Gdiplus::Matrix m;
-			m.Translate(tx, ty);
-			element->applyTransform(m);
+			// Apply translation using visitor pattern
+			SVGTranslate translateVisitor(tx, ty);
+			element->accept(&translateVisitor);
+			std::cout << "Applied translate(" << tx << ", " << ty << ")" << std::endl;
 		}
-		// TO DO 'scale' and 'rotate'
+		else if (token.find("rotate(") != std::string::npos) {
+			float degree = 0;
+			std::string content = token.substr(token.find('(') + 1);
+			
+			// Parse rotate(angle)
+			std::stringstream vals(content);
+			std::string angleStr;
+			if (std::getline(vals, angleStr, ',')) {
+				degree = std::stof(angleStr);
+			}
+			
+			// Apply rotation using visitor pattern
+			SVGRotate rotateVisitor(degree);
+			element->accept(&rotateVisitor);
+			std::cout << "Applied rotate(" << degree << ")" << std::endl;
+		}
+		else if (token.find("scale(") != std::string::npos) {
+			float sx = 1, sy = 1;
+			std::string content = token.substr(token.find('(') + 1);
+			std::stringstream vals(content);
+			std::string xStr, yStr;
+
+			if (std::getline(vals, xStr, ',') && std::getline(vals, yStr, ',')) {
+				sx = std::stof(xStr);
+				sy = std::stof(yStr);
+				// Apply XY scaling using visitor pattern
+				SVGScaleByXY scaleVisitor(sx, sy);
+				element->accept(&scaleVisitor);
+				std::cout << "Applied scale(" << sx << ", " << sy << ")" << std::endl;
+			}
+			else if (!xStr.empty()) {
+				sx = std::stof(xStr);
+				// Apply uniform scaling using visitor pattern
+				SVGScaleByTimes scaleVisitor(sx);
+				element->accept(&scaleVisitor);
+				std::cout << "Applied scale(" << sx << ")" << std::endl;
+			}
+		}
 	}
 }
 
@@ -551,6 +604,245 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			
 			std::cout << "Text attributes - x:" << xStr << " y:" << yStr << " font-size:" << sizeStr << std::endl;
 			
+			if (!xStr.empty() && !yStr.empty() && !sizeStr.empty()) {
+				float x = stof(xStr);
+				float y = stof(yStr);
+				PointF startPoint{ x, y };
+				TextPaintStyle t = parseTextStyle(node);
+				float size = stof(sizeStr);
+
+				SVGText* text = new SVGText(content, startPoint, t, size);
+
+				std::string transformStr = extractAttr(node, "transform");
+				if (!transformStr.empty()) {
+					parseTransform(text, transformStr);
+				}
+
+				std::cout << "Created text successfully" << std::endl;
+				return text;
+			}
+		}
+	}
+
+	std::cout << "No element created for: " << nodeName << std::endl;
+	return nullptr;
+}
+
+SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node, const PaintStyle& inheritedStyle)
+{
+	if (!node) return nullptr;
+
+	// Parse style riêng nếu có
+	PaintStyle localStyle = parsePaintStyle(node);
+	PaintStyle finalStyle = mergePaintStyle(inheritedStyle, localStyle);
+
+	std::string nodeName = node->name();
+	std::cout << "Creating element for: " << nodeName << std::endl;
+
+	// rectangle
+	if (nodeName == "rect")
+	{
+		/*PaintStyle s = parsePaintStyle(node);*/
+		std::string xStr = extractAttr(node, "x");
+		std::string yStr = extractAttr(node, "y");
+		std::string widthStr = extractAttr(node, "width");
+		std::string heightStr = extractAttr(node, "height");
+
+		std::cout << "Rect attributes - x:" << xStr << " y:" << yStr
+			<< " width:" << widthStr << " height:" << heightStr << std::endl;
+
+		if (!xStr.empty() && !yStr.empty() && !widthStr.empty() && !heightStr.empty()) {
+			REAL x = static_cast<REAL>(std::stof(xStr));
+			REAL y = static_cast<REAL>(std::stof(yStr));
+			REAL width = static_cast<REAL>(std::stof(widthStr));
+			REAL height = static_cast<REAL>(std::stof(heightStr));
+			PointF topLeft(x, y);
+
+			SVGRect* rect = new SVGRect(topLeft, width, height, finalStyle);
+
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(rect, transformStr);
+			}
+
+			std::cout << "Created rect successfully" << std::endl;
+			return rect;
+		}
+	}
+
+	// circle
+	else if (nodeName == "circle")
+	{
+		std::string cxStr = extractAttr(node, "cx");
+		std::string cyStr = extractAttr(node, "cy");
+		std::string rStr = extractAttr(node, "r");
+
+		std::cout << "Circle attributes - cx:" << cxStr << " cy:" << cyStr << " r:" << rStr << std::endl;
+
+		if (!cxStr.empty() && !cyStr.empty() && !rStr.empty()) {
+			float x = std::stof(cxStr);
+			float y = std::stof(cyStr);
+			float radius = std::stof(rStr);
+			PointF topLeft{ x, y };
+			/*PaintStyle s = parsePaintStyle(node);*/
+
+			SVGCircle* circle = new SVGCircle(topLeft, radius, finalStyle);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(circle, transformStr);
+			}
+
+			std::cout << "Created circle successfully" << std::endl;
+			return circle;
+		}
+	}
+
+	// line
+	else if (nodeName == "line")
+	{
+		std::string x1Str = extractAttr(node, "x1");
+		std::string y1Str = extractAttr(node, "y1");
+		std::string x2Str = extractAttr(node, "x2");
+		std::string y2Str = extractAttr(node, "y2");
+
+		std::cout << "Line attributes - x1:" << x1Str << " y1:" << y1Str << " x2:" << x2Str << " y2:" << y2Str << std::endl;
+
+		if (!x1Str.empty() && !y1Str.empty() && !x2Str.empty() && !y2Str.empty()) {
+			float x1 = std::stof(x1Str);
+			float y1 = std::stof(y1Str);
+			float x2 = std::stof(x2Str);
+			float y2 = std::stof(y2Str);
+			/*PaintStyle s = parsePaintStyle(node);*/
+
+			SVGLine* line = new SVGLine(x1, x2, y1, y2, finalStyle);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(line, transformStr);
+			}
+
+			std::cout << "Created line successfully" << std::endl;
+			return line;
+		}
+	}
+
+	// ellipse
+	else if (nodeName == "ellipse")
+	{
+		std::string cxStr = extractAttr(node, "cx");
+		std::string cyStr = extractAttr(node, "cy");
+		std::string rxStr = extractAttr(node, "rx");
+		std::string ryStr = extractAttr(node, "ry");
+
+		std::cout << "Ellipse attributes - cx:" << cxStr << " cy:" << cyStr << " rx:" << rxStr << " ry:" << ryStr << std::endl;
+
+		if (!cxStr.empty() && !cyStr.empty() && !rxStr.empty() && !ryStr.empty()) {
+			float cx = std::stof(cxStr);
+			float cy = std::stof(cyStr);
+			float rx = std::stof(rxStr);
+			float ry = std::stof(ryStr);
+			/*PaintStyle s = parsePaintStyle(node);*/
+
+			SVGEllipse* ellipse = new SVGEllipse(cx, cy, rx, ry, finalStyle);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(ellipse, transformStr);
+			}
+
+			std::cout << "Created ellipse successfully" << std::endl;
+			return ellipse;
+		}
+	}
+
+	// polygon
+	else if (nodeName == "polygon")
+	{
+		std::string pointStr = extractAttr(node, "points");
+		std::cout << "Polygon points: " << pointStr << std::endl;
+
+		if (!pointStr.empty()) {
+			std::vector<PointF> points = parsePoints(pointStr);
+			std::cout << "Parsed " << points.size() << " points for polygon" << std::endl;
+
+			/*PaintStyle s = parsePaintStyle(node);*/
+
+			SVGPolygon* polygon = new SVGPolygon(points, finalStyle);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(polygon, transformStr);
+			}
+
+			std::cout << "Created polygon successfully" << std::endl;
+			return polygon;
+		}
+	}
+
+	// polyline
+	else if (nodeName == "polyline")
+	{
+		std::string pointStr = extractAttr(node, "points");
+		std::cout << "Polyline points: " << pointStr << std::endl;
+		if (!pointStr.empty()) {
+			std::vector<PointF> points = parsePoints(pointStr);
+			std::cout << "Parsed " << points.size() << " points for polyline" << std::endl;
+
+			/*PaintStyle s = parsePaintStyle(node);*/
+
+			SVGPolyline* polyline = new SVGPolyline(points, finalStyle);
+
+			// Áp dụng transform nếu có
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(polyline, transformStr);
+			}
+
+			std::cout << "Created polyline successfully" << std::endl;
+			return polyline;
+		}
+	}
+
+	// path
+	else if (nodeName == "path")
+	{
+		std::string data = extractAttr(node, "d");
+		std::cout << "Path data: " << data << std::endl;
+
+		if (!data.empty())
+		{
+			/*PaintStyle style = parsePaintStyle(node);*/
+			SVGPath* path = new SVGPath(data, finalStyle);
+
+			std::string transformStr = extractAttr(node, "transform");
+			if (!transformStr.empty()) {
+				parseTransform(path, transformStr);
+			}
+
+			std::cout << "Created path successfully" << std::endl;
+			return path;
+		}
+	}
+
+	// text
+	else if (nodeName == "text")
+	{
+		std::wstring content = extractText(node);
+		std::cout << "Text content length: " << content.length() << std::endl;
+
+		if (!content.empty())
+		{
+			std::string xStr = extractAttr(node, "x");
+			std::string yStr = extractAttr(node, "y");
+			std::string sizeStr = extractAttr(node, "font-size");
+
+			std::cout << "Text attributes - x:" << xStr << " y:" << yStr << " font-size:" << sizeStr << std::endl;
+
 			if (!xStr.empty() && !yStr.empty() && !sizeStr.empty()) {
 				float x = stof(xStr);
 				float y = stof(yStr);

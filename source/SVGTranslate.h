@@ -1,5 +1,5 @@
-#ifndef SVGROTATE_H
-#define SVGROTATE_H
+#ifndef SVGTRANSLATE_H
+#define SVGTRANSLATE_H
 
 #include "SVGVisitor.h"
 #include "SVGCircle.h"
@@ -12,17 +12,14 @@
 #include "SVGPolyline.h"
 #include "SVGElement.h"
 #include "SVGBasics.h"
-#include <cmath>
 
-constexpr double pi = 3.14159265358979323846;
-
-class SVGRotate : public SVGVisitor
+class SVGTranslate : public SVGVisitor
 {
 private:
-    float degree;
+    float tx, ty;
 
 public:
-    SVGRotate(float degree) : degree(degree) {}
+    SVGTranslate(float tx, float ty) : tx(tx), ty(ty) {}
 
     void visit(SVGCircle *circle) override;
     void visit(SVGRect *rectangle) override;
@@ -34,4 +31,5 @@ public:
     void visit(SVGPolyline *polyline) override;
     void visit(SVGGroup *group) override;
 };
+
 #endif

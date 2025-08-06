@@ -12,6 +12,7 @@
 #include "SVGPolygon.h"
 #include "SVGPolyline.h"
 #include "../rapidxml/rapidxml.hpp"
+#include "../rapidxml/rapidxml_utils.hpp"
 
 #include <fstream>
 #include <sstream>
@@ -38,6 +39,7 @@ private:
    rapidxml::xml_document<> doc;
    char* xmlData; // Store XML data for RapidXML
    std::stack<PaintStyle> paintStyleStack;
+   std::stack<TextPaintStyle> textStyleStack;
 
 public:
    // Constructor and Destructor
@@ -55,6 +57,7 @@ public:
    void parseTransform(SVGElement* element, const std::string& transformStr);
    SVGElement *createElementFromNode(rapidxml::xml_node<>* node);
    SVGElement* createElementFromNodeWithStyle(rapidxml::xml_node<>* node, const PaintStyle& inheritedStyle);
+   SVGElement* createTextFromNodeWithStyle(rapidxml::xml_node<>* node, const TextPaintStyle& inheritedTextStyle);
 
    // Getters
    std::vector<SVGElement*> getElements() const;

@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "SVGPolygon.h"
 
 // Function helps double dispatch
@@ -16,6 +16,11 @@ void SVGPolygon::addPoint(const PointF& point) {
 
 void SVGPolygon::draw(Graphics* graphics) const {
     if (points.empty()) return;
+    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
+    GraphicsState state = graphics->Save();
+
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
 
     // Convert vector<PointF> to array
     int count = static_cast<int>(points.size());
@@ -45,4 +50,7 @@ void SVGPolygon::draw(Graphics* graphics) const {
         Pen strokePen(strokeColor, style.strokeWidth);
         graphics->DrawPolygon(&strokePen, arr.get(), count);
     }
+
+    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
+    graphics->Restore(state);
 }

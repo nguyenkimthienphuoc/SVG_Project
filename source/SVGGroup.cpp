@@ -27,8 +27,8 @@ void SVGGroup::draw(Graphics* graphics) const {
     // Lưu lại trạng thái gốc của Graphics (bao gồm transform)
     Gdiplus::GraphicsState state = graphics->Save();
 
-    // Áp dụng transform của group nếu có
-    graphics->MultiplyTransform(&transformMatrix, Gdiplus::MatrixOrderAppend);
+    // Áp dụng transform nếu có
+    graphics->MultiplyTransform(&getTransform());
 
     // Vẽ các phần tử con
     for (SVGElement* element : children) {

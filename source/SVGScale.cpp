@@ -110,11 +110,16 @@ void SVGScaleByTimes::visit(SVGPath *path)
 }
 
 void SVGScaleByTimes::visit(SVGGroup *group)
-{
-    // Apply scaling to all children in the group
-    for (auto child : group->getChildren()) {
-        child->accept(this);
-    }
+{   
+  
+    Gdiplus::Matrix scaleMatrix;
+    scaleMatrix.Scale(times, times);
+    group->applyTransform(scaleMatrix);
+
+    //// Apply scaling to all children in the group
+    //for (auto child : group->getChildren()) {
+    //    child->accept(this);
+    //}
 }
 
 // SVGScaleByXY implementations
@@ -225,9 +230,15 @@ void SVGScaleByXY::visit(SVGPath *path)
 }
 
 void SVGScaleByXY::visit(SVGGroup *group)
-{
-    // Apply scaling to all children in the group
-    for (auto child : group->getChildren()) {
-        child->accept(this);
-    }
+{   
+
+    Gdiplus::Matrix scaleMatrix;
+    scaleMatrix.Scale(x, y);
+    group->applyTransform(scaleMatrix);
+ 
+
+    //// Apply scaling to all children in the group
+    //for (auto child : group->getChildren()) {
+    //    child->accept(this);
+    //}
 }

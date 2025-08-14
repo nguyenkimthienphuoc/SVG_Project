@@ -109,7 +109,7 @@ void SVGScaleByTimes::visit(SVGPath *path)
     path->applyTransform(scaleMatrix);
 }
 
-void SVGScaleByTimes::visit(SsVGGroup *group)
+void SVGScaleByTimes::visit(SVGGroup *group)
 {
     // Apply scaling to all children in the group
     for (auto child : group->getChildren()) {

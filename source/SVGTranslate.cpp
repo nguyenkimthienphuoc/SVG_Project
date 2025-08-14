@@ -99,9 +99,16 @@ void SVGTranslate::visit(SVGPolyline *polyline)
 }
 
 void SVGTranslate::visit(SVGGroup *group)
-{
-    // Apply translation to all children in the group
-    for (auto child : group->getChildren()) {
-        child->accept(this);
-    }
+{   
+    // Apply translation using matrix transform
+    Gdiplus::Matrix translateMatrix;
+    translateMatrix.Translate(tx, ty);
+
+    // Apply the translation transform to the element
+    group->applyTransform(translateMatrix);
+
+    //// Apply translation to all children in the group
+    //for (auto child : group->getChildren()) {
+    //    child->accept(this);
+    //}
 }

@@ -168,7 +168,11 @@ void SVGRotate::visit(SVGPath *path)
 }
 
 void SVGRotate::visit(SVGGroup *group)
-{
+{   
+    Gdiplus::Matrix rotateMatrix;
+    rotateMatrix.Rotate(degree);
+    group->applyTransform(rotateMatrix);
+		std::cout << "Applied matrix rotation " << degree << " degrees to group" << std::endl;
     // Apply rotation to all children in the group
     for (auto child : group->getChildren()) {
         child->accept(this);

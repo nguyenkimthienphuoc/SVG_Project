@@ -1,4 +1,6 @@
 ﻿#include "stdafx.h"
+#include <unordered_map>
+#include <limits>
 
 std::string readSVGFile(const std::string &filePath)
 {
@@ -213,22 +215,36 @@ void SVGParser::parseLinearGradient(rapidxml::xml_node<>* node) {
 	if (g.id.empty()) return;
 
 	std::string units = extractAttr(node, "gradientUnits");
-	g.userSpaceOnUse = (units == "userSpaceOnUse");
+	if (!units.empty()) { g.unitsSpecified = true; g.userSpaceOnUse = (units == "userSpaceOnUse"); }
 
 	// default SVG: x1=0%, y1=0%, x2=100%, y2=0%
-	auto x1s = extractAttr(node, "x1"); g.x1 = x1s.empty() ? 0.0f : std::stof(x1s);
-	auto y1s = extractAttr(node, "y1"); g.y1 = y1s.empty() ? 0.0f : std::stof(y1s);
-	auto x2s = extractAttr(node, "x2"); g.x2 = x2s.empty() ? 1.0f : std::stof(x2s);
-	auto y2s = extractAttr(node, "y2"); g.y2 = y2s.empty() ? 0.0f : std::stof(y2s);
+	auto parseCoord = [](const std::string &s, float fallback) -> float {
+		if (s.empty()) return fallback;
+		if (s.back() == '%') {
+			return std::stof(s.substr(0, s.size()-1)) / 100.0f;
+		}
+		return std::stof(s);
+	};
+	auto x1s = extractAttr(node, "x1"); if (!x1s.empty()) { g.x1 = parseCoord(x1s, 0.0f); g.x1Specified = true; }
+	auto y1s = extractAttr(node, "y1"); if (!y1s.empty()) { g.y1 = parseCoord(y1s, 0.0f); g.y1Specified = true; }
+	auto x2s = extractAttr(node, "x2"); if (!x2s.empty()) { g.x2 = parseCoord(x2s, 1.0f); g.x2Specified = true; }
+	auto y2s = extractAttr(node, "y2"); if (!y2s.empty()) { g.y2 = parseCoord(y2s, 0.0f); g.y2Specified = true; }
 
+	// Accept either xlink:href or href
 	std::string href = extractAttr(node, "xlink:href");
+	if (href.empty()) href = extractAttr(node, "href");
 	if (href.rfind("#", 0) == 0) href = href.substr(1);
 	g.href = href;
+
+	// spreadMethod (pad | reflect | repeat)
+	g.spreadMethod = extractAttr(node, "spreadMethod");
+	if (g.spreadMethod.empty()) g.spreadMethod = "pad";
 
 	// gradientTransform
 	std::string t = extractAttr(node, "gradientTransform");
 	if (!t.empty()) {
 		g.transform = parseTransformToMatrix(t);
+		g.transformSpecified = true;
 	}
 
 	// stops
@@ -239,7 +255,9 @@ void SVGParser::parseLinearGradient(rapidxml::xml_node<>* node) {
 			s.offset = std::stof(off) / 100.0f;
 		}
 		else {
-			s.offset = off.empty() ? 0.0f : std::stof(off);
+			// use NaN to mark "unspecified" offsets so we can interpolate later
+			if (off.empty()) s.offset = std::numeric_limits<float>::quiet_NaN();
+			else s.offset = std::stof(off);
 		}
 		std::string sc = extractAttr(st, "stop-color");
 		std::string so = extractAttr(st, "stop-opacity");
@@ -261,29 +279,45 @@ void SVGParser::parseRadialGradient(rapidxml::xml_node<>* node) {
 	if (g.id.empty()) return;
 
 	std::string units = extractAttr(node, "gradientUnits");
-	g.userSpaceOnUse = (units == "userSpaceOnUse");
+	if (!units.empty()) { g.unitsSpecified = true; g.userSpaceOnUse = (units == "userSpaceOnUse"); }
 
-	auto cxs = extractAttr(node, "cx"); g.cx = cxs.empty() ? 0.5f : std::stof(cxs);
-	auto cys = extractAttr(node, "cy"); g.cy = cys.empty() ? 0.5f : std::stof(cys);
-	auto rs = extractAttr(node, "r");  g.r = rs.empty() ? 0.5f : std::stof(rs);
+	// support percentages for coords
+	auto parseCoord = [](const std::string &s, float fallback) -> float {
+		if (s.empty()) return fallback;
+		if (s.back() == '%') return std::stof(s.substr(0, s.size()-1)) / 100.0f;
+		return std::stof(s);
+	};
+	auto cxs = extractAttr(node, "cx"); if (!cxs.empty()) { g.cx = parseCoord(cxs, 0.5f); g.cxSpecified = true; }
+	auto cys = extractAttr(node, "cy"); if (!cys.empty()) { g.cy = parseCoord(cys, 0.5f); g.cySpecified = true; }
+	auto rs = extractAttr(node, "r");  if (!rs.empty()) { g.r = parseCoord(rs, 0.5f); g.rSpecified = true; }
 
-	auto fxs = extractAttr(node, "fx"); if (!fxs.empty()) g.fx = std::stof(fxs);
-	auto fys = extractAttr(node, "fy"); if (!fys.empty()) g.fy = std::stof(fys);
+	auto fxs = extractAttr(node, "fx"); if (!fxs.empty()) { g.fx = parseCoord(fxs, -1.0f); g.fxSpecified = true; }
+	auto fys = extractAttr(node, "fy"); if (!fys.empty()) { g.fy = parseCoord(fys, -1.0f); g.fySpecified = true; }
 
+	// Accept either xlink:href or href
 	std::string href = extractAttr(node, "xlink:href");
+	if (href.empty()) href = extractAttr(node, "href");
 	if (href.rfind("#", 0) == 0) href = href.substr(1);
 	g.href = href;
+
+	// spreadMethod
+	g.spreadMethod = extractAttr(node, "spreadMethod");
+	if (g.spreadMethod.empty()) g.spreadMethod = "pad";
 
 	std::string t = extractAttr(node, "gradientTransform");
 	if (!t.empty()) {
 		g.transform = parseTransformToMatrix(t);
+		g.transformSpecified = true;
 	}
 
 	for (auto* st = node->first_node("stop"); st; st = st->next_sibling("stop")) {
 		SVGGradientStop s;
 		std::string off = extractAttr(st, "offset");
 		if (off.find('%') != std::string::npos) s.offset = std::stof(off) / 100.0f;
-		else s.offset = off.empty() ? 0.0f : std::stof(off);
+		else {
+			if (off.empty()) s.offset = std::numeric_limits<float>::quiet_NaN();
+			else s.offset = std::stof(off);
+		}
 
 		std::string sc = extractAttr(st, "stop-color");
 		std::string so = extractAttr(st, "stop-opacity");
@@ -464,7 +498,31 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 {
 	PaintStyle s;
 
-	if (std::string stroke_str = extractAttr(node, "stroke"); !stroke_str.empty()) {
+	// Support style="key:val; key2:val2" inline CSS style attribute
+	std::string styleAttr = extractAttr(node, "style");
+	std::unordered_map<std::string, std::string> styleMap;
+	if (!styleAttr.empty()) {
+		// split by ';'
+		std::stringstream ss(styleAttr);
+		std::string decl;
+		while (std::getline(ss, decl, ';')) {
+			auto pos = decl.find(':');
+			if (pos == std::string::npos) continue;
+			std::string key = decl.substr(0, pos);
+			std::string val = decl.substr(pos+1);
+			// trim spaces
+			auto trim = [](std::string &str) {
+				while (!str.empty() && isspace((unsigned char)str.front())) str.erase(str.begin());
+				while (!str.empty() && isspace((unsigned char)str.back())) str.pop_back();
+			};
+			trim(key); trim(val);
+			styleMap[key] = val;
+		}
+	}
+
+	std::string stroke_str = extractAttr(node, "stroke");
+	if (stroke_str.empty() && styleMap.count("stroke")) stroke_str = styleMap["stroke"];
+	if (!stroke_str.empty()) {
 		if (stroke_str == "none") {
 			s.strokeNone = true;
 			s.strokeOpacity = 0.0f;
@@ -482,7 +540,9 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 		}
 	}
 
-	if (std::string fill_str = extractAttr(node, "fill"); !fill_str.empty()) {
+	std::string fill_str = extractAttr(node, "fill");
+	if (fill_str.empty() && styleMap.count("fill")) fill_str = styleMap["fill"];
+	if (!fill_str.empty()) {
 		if (fill_str == "none") {
 			s.fillNone = true;
 			s.fillOpacity = 0.0f;
@@ -500,24 +560,25 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 		}
 	}
 
-	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())
-	{
+	// opacity and specific opacities: accept both attribute and style map
+	std::string opacity_str = extractAttr(node, "opacity"); if (opacity_str.empty() && styleMap.count("opacity")) opacity_str = styleMap["opacity"];
+	if (!opacity_str.empty()) {
 		s.strokeOpacity *= std::stof(opacity_str);
 		s.fillOpacity *= std::stof(opacity_str);
 	}
 
-	if (std::string fillO = extractAttr(node, "fill-opacity"); !fillO.empty())
-	{
+	std::string fillO = extractAttr(node, "fill-opacity"); if (fillO.empty() && styleMap.count("fill-opacity")) fillO = styleMap["fill-opacity"];
+	if (!fillO.empty()) {
 		s.fillOpacity = std::stof(fillO);
 	}
 
-	if (std::string strokeO = extractAttr(node, "stroke-opacity"); !strokeO.empty())
-	{
+	std::string strokeO = extractAttr(node, "stroke-opacity"); if (strokeO.empty() && styleMap.count("stroke-opacity")) strokeO = styleMap["stroke-opacity"];
+	if (!strokeO.empty()) {
 		s.strokeOpacity = std::stof(strokeO);
 	}
 
-	if (std::string strokeW = extractAttr(node, "stroke-width"); !strokeW.empty())
-	{
+	std::string strokeW = extractAttr(node, "stroke-width"); if (strokeW.empty() && styleMap.count("stroke-width")) strokeW = styleMap["stroke-width"];
+	if (!strokeW.empty()) {
 		s.strokeWidth = std::stof(strokeW);
 	}
 

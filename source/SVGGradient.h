@@ -16,22 +16,31 @@ struct SVGGradientStop {
 struct SVGLinearGradientDef {
     std::string id;
     bool userSpaceOnUse = false;
+    bool unitsSpecified = false;
     // x1,y1,x2,y2: nếu !userSpaceOnUse thì hiểu là theo bbox (0..1)
     float x1 = 0.0f, y1 = 0.0f, x2 = 1.0f, y2 = 0.0f;
+    bool x1Specified = false, y1Specified = false, x2Specified = false, y2Specified = false;
     std::unique_ptr<Gdiplus::Matrix> transform; // gradientTransform
+    bool transformSpecified = false;
     std::vector<SVGGradientStop> stops;
     std::string href; // xlink:href
+    std::string spreadMethod = "pad"; // pad | reflect | repeat (default pad)
 };
 
 struct SVGRadialGradientDef {
     std::string id;
     bool userSpaceOnUse = false;
+    bool unitsSpecified = false;
     // nếu !userSpaceOnUse thì các giá trị theo bbox (0..1)
     float cx = 0.5f, cy = 0.5f, r = 0.5f;
     float fx = -1.0f, fy = -1.0f; // -1 = “không đặt”, sẽ dùng cx,cy
+    bool cxSpecified = false, cySpecified = false, rSpecified = false;
+    bool fxSpecified = false, fySpecified = false;
     std::unique_ptr<Gdiplus::Matrix> transform; // gradientTransform
+    bool transformSpecified = false;
     std::vector<SVGGradientStop> stops;
     std::string href; // xlink:href
+    std::string spreadMethod = "pad"; // pad | reflect | repeat (default pad)
 };
 
 class SVGGradientRegistry {

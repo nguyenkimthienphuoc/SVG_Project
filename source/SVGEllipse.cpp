@@ -26,40 +26,34 @@ float SVGEllipse::getCy() const { return cy; }
 float SVGEllipse::getRx() const { return rx; }
 float SVGEllipse::getRy() const { return ry; }
 
+Gdiplus::RectF SVGEllipse::localBounds() const {
+    return Gdiplus::RectF(cx - rx, cy - ry, 2 * rx, 2 * ry);
+}
+
 void SVGEllipse::draw(Gdiplus::Graphics* graphics) const {
-    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
-    GraphicsState state = graphics->Save();
-
-    // Áp dụng transform nếu có
+    auto state = graphics->Save();
     graphics->MultiplyTransform(&getTransform());
+    RectF bb = localBounds();
 
-    float left = cx - rx;
-    float top = cy - ry;
-    float width = 2 * rx;
-    float height = 2 * ry;
-
-    // Fill ellipse
-    if (style.fillOpacity > 0.0f) {
-        BYTE fillAlpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
-        Color fillColor(fillAlpha,
-            style.fillColor.GetR(),
-            style.fillColor.GetG(),
-            style.fillColor.GetB());
-        SolidBrush fillBrush(fillColor);
-        graphics->FillEllipse(&fillBrush, left, top, width, height);
+    if (!style.fillNone && style.fillOpacity > 0.0f) {
+        if (gradientRegistry && !style.fillUrlId.empty()) {
+            auto brush = gradientRegistry->makeBrush(style.fillUrlId, bb);
+            if (brush) graphics->FillEllipse(brush.get(), bb);
+        }
+        else {
+            BYTE a = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
+            Color c(a, style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB());
+            SolidBrush br(c);
+            graphics->FillEllipse(&br, bb);
+        }
     }
 
-    // Stroke ellipse (only if stroke is visible)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
-        BYTE strokeAlpha = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
-        Color strokeColor(strokeAlpha,
-            style.strokeColor.GetR(),
-            style.strokeColor.GetG(),
-            style.strokeColor.GetB());
-        Pen strokePen(strokeColor, style.strokeWidth);
-        graphics->DrawEllipse(&strokePen, left, top, width, height);
+    if (!style.strokeNone && style.strokeWidth > 0 && style.strokeOpacity > 0) {
+        BYTE a = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
+        Color c(a, style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB());
+        Pen pen(c, style.strokeWidth);
+        graphics->DrawEllipse(&pen, bb);
     }
 
-    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);
 }

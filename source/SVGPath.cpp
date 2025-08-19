@@ -10,6 +10,8 @@ void SVGPath::accept(SVGVisitor* visitor){
 SVGPath::SVGPath(const std::string& data, const PaintStyle& style) : pathData(data) {
     this->style = style;
 }
+
+
 void SVGPath::draw(Graphics* graphics) const {
     if (!graphics) return;
 
@@ -172,23 +174,40 @@ void SVGPath::draw(Graphics* graphics) const {
         }
     }
 
-    // Render
-    if (style.fillColor.GetA() > 0 && style.fillOpacity > 0) {
-        SolidBrush fillBrush(Color(
-            static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA()),
-            style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB()));
-        graphics->FillPath(&fillBrush, &gp);
-        std::cout << "Filled path" << std::endl;
+    auto state = graphics->Save();
+    graphics->MultiplyTransform(&getTransform());
+
+    // Bounds theo local coords (trước transform vì transform đã áp vào Graphics)
+    Gdiplus::RectF bb;
+    gp.GetBounds(&bb);
+
+    // FILL
+    if (!style.fillNone && style.fillOpacity > 0.0f) {
+        if (gradientRegistry && !style.fillUrlId.empty()) {
+            auto brush = gradientRegistry->makeBrush(style.fillUrlId, bb);
+            if (brush) {
+                graphics->FillPath(brush.get(), &gp);
+            }
+        }
+        else if (style.fillColor.GetA() > 0) {
+            SolidBrush fillBrush(Color(
+                static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA()),
+                style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB()));
+            graphics->FillPath(&fillBrush, &gp);
+        }
     }
-    
-    if (style.strokeColor.GetA() > 0 && style.strokeOpacity > 0 && style.strokeWidth > 0) {
+
+    // STROKE giữ nguyên
+    if (!style.strokeNone && style.strokeColor.GetA() > 0 && style.strokeOpacity > 0 && style.strokeWidth > 0) {
         Pen strokePen(Color(
             static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA()),
             style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB()),
             style.strokeWidth);
         graphics->DrawPath(&strokePen, &gp);
-        std::cout << "Stroked path" << std::endl;
     }
+
+    graphics->Restore(state);
+
     
     std::cout << "Path rendering completed" << std::endl;
 }

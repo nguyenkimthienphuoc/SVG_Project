@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "SVGBasics.h"
 #include "SVGVisitor.h"
+#include "SVGGradient.h"
 #include <string>
 #include <windows.h>
 #include <gdiplus.h>
@@ -9,6 +10,7 @@
 class SVGElement {
 protected:
 	Gdiplus::Matrix transformMatrix;
+    const SVGGradientRegistry* gradientRegistry = nullptr;
 public:
 	PaintStyle style;
 
@@ -48,4 +50,9 @@ public:
         return transformMatrix;
     }
 
+    // NEW: để phần tử tính bbox cục bộ (trước transform)
+    virtual Gdiplus::RectF localBounds() const { return Gdiplus::RectF(0, 0, 0, 0); }
+
+    // NEW: cho parser set registry
+    void setGradientRegistry(const SVGGradientRegistry* reg) { gradientRegistry = reg; }
 };

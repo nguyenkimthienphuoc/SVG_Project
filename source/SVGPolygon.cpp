@@ -14,43 +14,45 @@ void SVGPolygon::addPoint(const PointF& point) {
 	points.push_back(point);
 }
 
-void SVGPolygon::draw(Graphics* graphics) const {
+Gdiplus::RectF SVGPolygon::localBounds() const {
+    if (points.empty()) return Gdiplus::RectF(0, 0, 0, 0);
+    float minx = points[0].X, maxx = points[0].X, miny = points[0].Y, maxy = points[0].Y;
+    for (auto& p : points) {
+        minx = (std::min)(minx, p.X); maxx = (std::max)(maxx, p.X);
+        miny = (std::min)(miny, p.Y); maxy = (std::max)(maxy, p.Y);
+    }
+    return Gdiplus::RectF(minx, miny, maxx - minx, maxy - miny);
+}
+
+void SVGPolygon::draw(Graphics* g) const {
     if (points.empty()) return;
-    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
-    GraphicsState state = graphics->Save();
+    auto state = g->Save();
+    g->MultiplyTransform(&getTransform());
 
-    // Áp dụng transform nếu có
-    graphics->MultiplyTransform(&getTransform());
+    const RectF bb = localBounds();
 
-    // Convert vector<PointF> to array
     int count = static_cast<int>(points.size());
     std::unique_ptr<PointF[]> arr(new PointF[count]);
-    for (int i = 0; i < count; ++i) {
-        arr[i] = points[i];
+    for (int i = 0; i < count; ++i) arr[i] = points[i];
+
+    if (!style.fillNone && style.fillOpacity > 0.0f) {
+        if (gradientRegistry && !style.fillUrlId.empty()) {
+            auto brush = gradientRegistry->makeBrush(style.fillUrlId, bb);
+            if (brush) g->FillPolygon(brush.get(), arr.get(), count);
+        }
+        else {
+            BYTE a = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
+            Color c(a, style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB());
+            SolidBrush br(c);
+            g->FillPolygon(&br, arr.get(), count);
+        }
     }
 
-    // Fill polygon
-    if (style.fillOpacity > 0.0f) {
-        BYTE fillAlpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
-        Color fillColor(fillAlpha,
-            style.fillColor.GetR(),
-            style.fillColor.GetG(),
-            style.fillColor.GetB());
-        SolidBrush fillBrush(fillColor);
-        graphics->FillPolygon(&fillBrush, arr.get(), count);
+    if (!style.strokeNone && style.strokeWidth > 0 && style.strokeOpacity > 0) {
+        BYTE a = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
+        Color c(a, style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB());
+        Pen pen(c, style.strokeWidth);
+        g->DrawPolygon(&pen, arr.get(), count);
     }
-
-    // Stroke polygon (only if stroke is visible)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
-        BYTE strokeAlpha = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
-        Color strokeColor(strokeAlpha,
-            style.strokeColor.GetR(),
-            style.strokeColor.GetG(),
-            style.strokeColor.GetB());
-        Pen strokePen(strokeColor, style.strokeWidth);
-        graphics->DrawPolygon(&strokePen, arr.get(), count);
-    }
-
-    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
-    graphics->Restore(state);
+    g->Restore(state);
 }

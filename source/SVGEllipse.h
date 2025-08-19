@@ -19,4 +19,6 @@ public:
 
     void draw(Graphics* graphics) const override;
     void accept(SVGVisitor* visitor) override;
+
+    Gdiplus::RectF localBounds() const override;
 };

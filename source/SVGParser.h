@@ -11,6 +11,7 @@
 #include "SVGPath.h"
 #include "SVGPolygon.h"
 #include "SVGPolyline.h"
+#include "SVGGradient.h"
 #include "../rapidxml/rapidxml.hpp"
 #include "../rapidxml/rapidxml_utils.hpp"
 
@@ -21,7 +22,7 @@
 #include <gdiplus.h>
 #include <cstring>
 #include <stack>
-
+#include <memory> 
 using namespace Gdiplus;
 
 std::string readSVGFile(const std::string& filePath);
@@ -40,6 +41,8 @@ private:
    char* xmlData; // Store XML data for RapidXML
    std::stack<PaintStyle> paintStyleStack;
    std::stack<TextPaintStyle> textStyleStack;
+
+   SVGGradientRegistry gradientRegistry; // NEW
 
 public:
    // Constructor and Destructor
@@ -64,5 +67,14 @@ public:
    std::string getHeight() const;
    std::string getWidth() const;
    std::string getRawData() const;
+
+   // helpers
+   void parseDefs();                     // NEW
+   void parseLinearGradient(rapidxml::xml_node<>* node); // NEW
+   void parseRadialGradient(rapidxml::xml_node<>* node); // NEW
+   static bool parseBoolUserSpace(const std::string& val); // NEW
+   static float parseNumberOrPercent(const std::string& s, bool& isPercent); // opt (ta dùng trực tiếp 0..1)
+   static Gdiplus::Color parseStopColor(const std::string& col, const std::string& op); // NEW
+   std::unique_ptr<Gdiplus::Matrix> parseTransformToMatrix(const std::string& transformStr);
 };
 #endif

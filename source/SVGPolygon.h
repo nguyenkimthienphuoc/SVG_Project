@@ -13,4 +13,6 @@ public:
 
    const std::vector<PointF>& getPoints() const { return points; }
    void setPoints(vector<PointF> points) { this->points = points; }
+
+   Gdiplus::RectF localBounds() const override;
 };

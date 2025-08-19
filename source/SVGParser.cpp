@@ -569,31 +569,44 @@ void SVGParser::parseTransform(SVGElement* element, const std::string& transform
 			element->accept(&rotateVisitor);
 			std::cout << "Applied rotate(" << degree << ")" << std::endl;
 		}
-		else if (transformType == "scale") {
-			float sx = 1, sy = 1;
-			
-			// Replace commas with spaces to handle both formats
-			for (char& c : content) {
-				if (c == ',') c = ' ';
-			}
-			
-			std::stringstream vals(content);
-			std::string xStr, yStr;
 
-			if (vals >> xStr >> yStr) {
-				sx = std::stof(xStr);
-				sy = std::stof(yStr);
-				// Apply XY scaling using visitor pattern
-				SVGScaleByXY scaleVisitor(sx, sy);
-				element->accept(&scaleVisitor);
-				std::cout << "Applied scale(" << sx << ", " << sy << ")" << std::endl;
+		else if (transformType == "scale") {
+			std::string s = content;
+			bool hadComma = (s.find(',') != std::string::npos);
+			for (char& c : s) if (c == ',') c = ' ';
+
+			std::istringstream ss(s);
+
+			float sx;
+			if (!(ss >> sx)) {
+				std::cout << "scale(): missing sx in '" << content << "'\n";
+				return;
 			}
-			else if (vals >> xStr) {
-				sx = std::stof(xStr);
-				// Apply uniform scaling using visitor pattern
-				SVGScaleByTimes scaleVisitor(sx);
-				element->accept(&scaleVisitor);
-				std::cout << "Applied scale(" << sx << ")" << std::endl;
+
+			float sy;
+			// 2 parameters
+			if (ss >> sy) {
+				SVGScaleByXY v(sx, sy);
+				element->accept(&v);
+				std::cout << "Applied scale(" << sx << ", " << sy << ")\n";
+			}
+			else { // 1 parameters
+				// had 1 para, but have ',' -> invalid
+				if (hadComma) {
+					std::cout << "scale(): comma found but missing sy in '" << content << "'\n";
+					return;
+				}
+				
+				SVGScaleByTimes v(sx);
+				element->accept(&v);
+				std::cout << "Applied scale(" << sx << ")\n";
+			}
+
+			// Cảnh báo nếu còn rác phía sau (vd: "scale(2x)")
+			std::string leftover;
+			if (ss >> leftover) {
+				std::cout << "scale(): extra tokens ignored: '" << leftover
+					<< "' in '" << content << "'\n";
 			}
 		}
 		

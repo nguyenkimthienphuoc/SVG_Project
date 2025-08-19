@@ -17,42 +17,38 @@ SVGCircle::SVGCircle(Gdiplus::PointF center, float radius, const PaintStyle& s)
 // Draw the circle using GDI+
 // This uses the style's fill color, stroke color, and stroke width,
 // making it flexible and consistent with other SVG elements.
-void SVGCircle::draw(Gdiplus::Graphics* graphics) const {
-    if (!graphics) return; // Safety check to avoid null pointer dereference
-
-    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
-    GraphicsState state = graphics->Save();
-
-    // Áp dụng transform nếu có
-    graphics->MultiplyTransform(&getTransform());
-
-    // Calculate the top-left corner and diameter of the bounding box for the circle
+Gdiplus::RectF SVGCircle::localBounds() const {
     float left = center.X - radius;
     float top = center.Y - radius;
-    float diameter = radius * 2;
+    float d = radius * 2;
+    return Gdiplus::RectF(left, top, d, d);
+}
 
-    // Fill circle
-    if (style.fillOpacity > 0.0f) {
-        BYTE fillAlpha = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
-        Color fillColor(fillAlpha,
-            style.fillColor.GetR(),
-            style.fillColor.GetG(),
-            style.fillColor.GetB());
-        SolidBrush fillBrush(fillColor);
-        graphics->FillEllipse(&fillBrush, left, top, diameter, diameter);
+void SVGCircle::draw(Graphics* graphics) const {
+    if (!graphics) return;
+    auto state = graphics->Save();
+    graphics->MultiplyTransform(&getTransform());
+
+    RectF bb = localBounds();
+
+    if (!style.fillNone && style.fillOpacity > 0.0f) {
+        if (gradientRegistry && !style.fillUrlId.empty()) {
+            auto brush = gradientRegistry->makeBrush(style.fillUrlId, bb);
+            if (brush) graphics->FillEllipse(brush.get(), bb);
+        }
+        else {
+            BYTE a = static_cast<BYTE>(style.fillColor.GetA() * style.fillOpacity);
+            Color c(a, style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB());
+            SolidBrush br(c);
+            graphics->FillEllipse(&br, bb);
+        }
     }
 
-    // Stroke circle (only if stroke is visible)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
-        BYTE strokeAlpha = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
-        Color strokeColor(strokeAlpha,
-            style.strokeColor.GetR(),
-            style.strokeColor.GetG(),
-            style.strokeColor.GetB());
-        Pen strokePen(strokeColor, style.strokeWidth);
-        graphics->DrawEllipse(&strokePen, left, top, diameter, diameter);
+    if (!style.strokeNone && style.strokeWidth > 0 && style.strokeOpacity > 0) {
+        BYTE a = static_cast<BYTE>(style.strokeColor.GetA() * style.strokeOpacity);
+        Color c(a, style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB());
+        Pen pen(c, style.strokeWidth);
+        graphics->DrawEllipse(&pen, bb);
     }
-
-    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);
 }

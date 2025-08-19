@@ -1,4 +1,6 @@
 ﻿#include "stdafx.h"
+#include <unordered_map>
+#include <limits>
 
 std::string readSVGFile(const std::string &filePath)
 {
@@ -45,6 +47,7 @@ SVGParser::SVGParser(const std::string& filePath) : xmlData(nullptr)
 		
 		doc.parse<0>(xmlData);
 		parseHeader();
+		parseDefs();
 	}
 	catch (const rapidxml::parse_error& e) {
 		std::cerr << "XML Parse error: " << e.what() << std::endl;
@@ -189,6 +192,197 @@ void SVGParser::parseNode(rapidxml::xml_node<>* node)
 	}
 }
 
+void SVGParser::parseDefs() {
+	auto* svgRoot = doc.first_node("svg");
+	if (!svgRoot) return;
+	auto* defs = svgRoot->first_node("defs");
+	if (!defs) return;
+
+	for (auto* n = defs->first_node(); n; n = n->next_sibling()) {
+		std::string tag = n->name();
+		if (tag == "linearGradient") {
+			parseLinearGradient(n);
+		}
+		else if (tag == "radialGradient") {
+			parseRadialGradient(n);
+		}
+	}
+}
+
+void SVGParser::parseLinearGradient(rapidxml::xml_node<>* node) {
+	SVGLinearGradientDef g;
+	g.id = extractAttr(node, "id");
+	if (g.id.empty()) return;
+
+	std::string units = extractAttr(node, "gradientUnits");
+	if (!units.empty()) { g.unitsSpecified = true; g.userSpaceOnUse = (units == "userSpaceOnUse"); }
+
+	// default SVG: x1=0%, y1=0%, x2=100%, y2=0%
+	auto parseCoord = [](const std::string &s, float fallback) -> float {
+		if (s.empty()) return fallback;
+		if (s.back() == '%') {
+			return std::stof(s.substr(0, s.size()-1)) / 100.0f;
+		}
+		return std::stof(s);
+	};
+	auto x1s = extractAttr(node, "x1"); if (!x1s.empty()) { g.x1 = parseCoord(x1s, 0.0f); g.x1Specified = true; }
+	auto y1s = extractAttr(node, "y1"); if (!y1s.empty()) { g.y1 = parseCoord(y1s, 0.0f); g.y1Specified = true; }
+	auto x2s = extractAttr(node, "x2"); if (!x2s.empty()) { g.x2 = parseCoord(x2s, 1.0f); g.x2Specified = true; }
+	auto y2s = extractAttr(node, "y2"); if (!y2s.empty()) { g.y2 = parseCoord(y2s, 0.0f); g.y2Specified = true; }
+
+	// Accept either xlink:href or href
+	std::string href = extractAttr(node, "xlink:href");
+	if (href.empty()) href = extractAttr(node, "href");
+	if (href.rfind("#", 0) == 0) href = href.substr(1);
+	g.href = href;
+
+	// spreadMethod (pad | reflect | repeat)
+	g.spreadMethod = extractAttr(node, "spreadMethod");
+	if (g.spreadMethod.empty()) g.spreadMethod = "pad";
+
+	// gradientTransform
+	std::string t = extractAttr(node, "gradientTransform");
+	if (!t.empty()) {
+		g.transform = parseTransformToMatrix(t);
+		g.transformSpecified = true;
+	}
+
+	// stops
+	for (auto* st = node->first_node("stop"); st; st = st->next_sibling("stop")) {
+		SVGGradientStop s;
+		std::string off = extractAttr(st, "offset");
+		if (off.find('%') != std::string::npos) {
+			s.offset = std::stof(off) / 100.0f;
+		}
+		else {
+			// use NaN to mark "unspecified" offsets so we can interpolate later
+			if (off.empty()) s.offset = std::numeric_limits<float>::quiet_NaN();
+			else s.offset = std::stof(off);
+		}
+		std::string sc = extractAttr(st, "stop-color");
+		std::string so = extractAttr(st, "stop-opacity");
+		if (so.empty()) so = "1";
+		// parse màu đơn giản #RRGGBB hoặc tên cơ bản, bạn có thể tái dụng parseColor(...)
+		// ở đây thêm opacity vào alpha
+		Gdiplus::Color base = parseColor(sc);
+		BYTE a = static_cast<BYTE>(base.GetA() * std::stof(so));
+		s.color = Gdiplus::Color(a, base.GetR(), base.GetG(), base.GetB());
+		g.stops.push_back(s);
+	}
+	gradientRegistry.linear.emplace(g.id, std::move(g));
+
+}
+
+void SVGParser::parseRadialGradient(rapidxml::xml_node<>* node) {
+	SVGRadialGradientDef g;
+	g.id = extractAttr(node, "id");
+	if (g.id.empty()) return;
+
+	std::string units = extractAttr(node, "gradientUnits");
+	if (!units.empty()) { g.unitsSpecified = true; g.userSpaceOnUse = (units == "userSpaceOnUse"); }
+
+	// support percentages for coords
+	auto parseCoord = [](const std::string &s, float fallback) -> float {
+		if (s.empty()) return fallback;
+		if (s.back() == '%') return std::stof(s.substr(0, s.size()-1)) / 100.0f;
+		return std::stof(s);
+	};
+	auto cxs = extractAttr(node, "cx"); if (!cxs.empty()) { g.cx = parseCoord(cxs, 0.5f); g.cxSpecified = true; }
+	auto cys = extractAttr(node, "cy"); if (!cys.empty()) { g.cy = parseCoord(cys, 0.5f); g.cySpecified = true; }
+	auto rs = extractAttr(node, "r");  if (!rs.empty()) { g.r = parseCoord(rs, 0.5f); g.rSpecified = true; }
+
+	auto fxs = extractAttr(node, "fx"); if (!fxs.empty()) { g.fx = parseCoord(fxs, -1.0f); g.fxSpecified = true; }
+	auto fys = extractAttr(node, "fy"); if (!fys.empty()) { g.fy = parseCoord(fys, -1.0f); g.fySpecified = true; }
+
+	// Accept either xlink:href or href
+	std::string href = extractAttr(node, "xlink:href");
+	if (href.empty()) href = extractAttr(node, "href");
+	if (href.rfind("#", 0) == 0) href = href.substr(1);
+	g.href = href;
+
+	// spreadMethod
+	g.spreadMethod = extractAttr(node, "spreadMethod");
+	if (g.spreadMethod.empty()) g.spreadMethod = "pad";
+
+	std::string t = extractAttr(node, "gradientTransform");
+	if (!t.empty()) {
+		g.transform = parseTransformToMatrix(t);
+		g.transformSpecified = true;
+	}
+
+	for (auto* st = node->first_node("stop"); st; st = st->next_sibling("stop")) {
+		SVGGradientStop s;
+		std::string off = extractAttr(st, "offset");
+		if (off.find('%') != std::string::npos) s.offset = std::stof(off) / 100.0f;
+		else {
+			if (off.empty()) s.offset = std::numeric_limits<float>::quiet_NaN();
+			else s.offset = std::stof(off);
+		}
+
+		std::string sc = extractAttr(st, "stop-color");
+		std::string so = extractAttr(st, "stop-opacity");
+		if (so.empty()) so = "1";
+		Gdiplus::Color base = parseColor(sc);
+		BYTE a = static_cast<BYTE>(base.GetA() * std::stof(so));
+		s.color = Gdiplus::Color(a, base.GetR(), base.GetG(), base.GetB());
+		g.stops.push_back(s);
+	}
+	gradientRegistry.radial.emplace(g.id, std::move(g));
+}
+
+std::unique_ptr<Gdiplus::Matrix>
+SVGParser::parseTransformToMatrix(const std::string& transformStr) {
+	using namespace Gdiplus;
+	auto mat = std::make_unique<Matrix>(); // identity
+
+	std::string s = transformStr;
+	size_t pos = 0;
+	while (pos < s.size()) {
+		size_t open = s.find('(', pos);
+		if (open == std::string::npos) break;
+
+		std::string name = s.substr(pos, open - pos);
+		// trim spaces
+		while (!name.empty() && std::isspace((unsigned char)name.front())) name.erase(name.begin());
+		while (!name.empty() && std::isspace((unsigned char)name.back()))  name.pop_back();
+
+		size_t close = s.find(')', open);
+		if (close == std::string::npos) break;
+		std::string content = s.substr(open + 1, close - open - 1);
+
+		// replace commas with spaces
+		for (char& c : content) if (c == ',') c = ' ';
+		std::istringstream ss(content);
+
+		if (name == "matrix") {
+			float a, b, c, d, e, f;
+			if (ss >> a >> b >> c >> d >> e >> f) {
+				Matrix mm(a, b, c, d, e, f);
+				mat->Multiply(&mm, MatrixOrderAppend);
+			}
+		}
+		else if (name == "translate") {
+			float tx = 0, ty = 0; ss >> tx; if (!(ss >> ty)) ty = 0;
+			Matrix mm; mm.Translate(tx, ty);
+			mat->Multiply(&mm, MatrixOrderAppend);
+		}
+		else if (name == "scale") {
+			float sx = 1, sy = 1; ss >> sx; if (!(ss >> sy)) sy = sx;
+			Matrix mm; mm.Scale(sx, sy);
+			mat->Multiply(&mm, MatrixOrderAppend);
+		}
+		else if (name == "rotate") {
+			float deg = 0; ss >> deg;
+			Matrix mm; mm.Rotate(deg);
+			mat->Multiply(&mm, MatrixOrderAppend);
+		}
+
+		pos = close + 1;
+	}
+
+	return mat; // trả về unique_ptr (KHÔNG copy Matrix)
+}
+
 
 void SVGParser::parseHeader()
 {
@@ -304,34 +498,87 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 {
 	PaintStyle s;
 
-	if (std::string stroke_str = extractAttr(node, "stroke"); !stroke_str.empty())
-	{
-		s.strokeColor = parseColor(stroke_str);
+	// Support style="key:val; key2:val2" inline CSS style attribute
+	std::string styleAttr = extractAttr(node, "style");
+	std::unordered_map<std::string, std::string> styleMap;
+	if (!styleAttr.empty()) {
+		// split by ';'
+		std::stringstream ss(styleAttr);
+		std::string decl;
+		while (std::getline(ss, decl, ';')) {
+			auto pos = decl.find(':');
+			if (pos == std::string::npos) continue;
+			std::string key = decl.substr(0, pos);
+			std::string val = decl.substr(pos+1);
+			// trim spaces
+			auto trim = [](std::string &str) {
+				while (!str.empty() && isspace((unsigned char)str.front())) str.erase(str.begin());
+				while (!str.empty() && isspace((unsigned char)str.back())) str.pop_back();
+			};
+			trim(key); trim(val);
+			styleMap[key] = val;
+		}
 	}
 
-	if (std::string fill_str = extractAttr(node, "fill"); !fill_str.empty())
-	{
-		s.fillColor = parseColor(fill_str);
+	std::string stroke_str = extractAttr(node, "stroke");
+	if (stroke_str.empty() && styleMap.count("stroke")) stroke_str = styleMap["stroke"];
+	if (!stroke_str.empty()) {
+		if (stroke_str == "none") {
+			s.strokeNone = true;
+			s.strokeOpacity = 0.0f;
+			s.strokeWidth = 0.0f;
+		}
+		else if (stroke_str.rfind("url(", 0) == 0) {
+			auto start = stroke_str.find('#');
+			auto end = stroke_str.find(')', start);
+			if (start != std::string::npos && end != std::string::npos && end > start) {
+				s.strokeUrlId = stroke_str.substr(start + 1, end - start - 1);
+			}
+		}
+		else {
+			s.strokeColor = parseColor(stroke_str);
+		}
 	}
 
-	if (std::string opacity_str = extractAttr(node, "opacity"); !opacity_str.empty())
-	{
+	std::string fill_str = extractAttr(node, "fill");
+	if (fill_str.empty() && styleMap.count("fill")) fill_str = styleMap["fill"];
+	if (!fill_str.empty()) {
+		if (fill_str == "none") {
+			s.fillNone = true;
+			s.fillOpacity = 0.0f;
+		}
+		else if (fill_str.rfind("url(", 0) == 0) {
+			// url(#id)
+			auto start = fill_str.find('#');
+			auto end = fill_str.find(')', start);
+			if (start != std::string::npos && end != std::string::npos && end > start) {
+				s.fillUrlId = fill_str.substr(start + 1, end - start - 1);
+			}
+		}
+		else {
+			s.fillColor = parseColor(fill_str);
+		}
+	}
+
+	// opacity and specific opacities: accept both attribute and style map
+	std::string opacity_str = extractAttr(node, "opacity"); if (opacity_str.empty() && styleMap.count("opacity")) opacity_str = styleMap["opacity"];
+	if (!opacity_str.empty()) {
 		s.strokeOpacity *= std::stof(opacity_str);
 		s.fillOpacity *= std::stof(opacity_str);
 	}
 
-	if (std::string fillO = extractAttr(node, "fill-opacity"); !fillO.empty())
-	{
+	std::string fillO = extractAttr(node, "fill-opacity"); if (fillO.empty() && styleMap.count("fill-opacity")) fillO = styleMap["fill-opacity"];
+	if (!fillO.empty()) {
 		s.fillOpacity = std::stof(fillO);
 	}
 
-	if (std::string strokeO = extractAttr(node, "stroke-opacity"); !strokeO.empty())
-	{
+	std::string strokeO = extractAttr(node, "stroke-opacity"); if (strokeO.empty() && styleMap.count("stroke-opacity")) strokeO = styleMap["stroke-opacity"];
+	if (!strokeO.empty()) {
 		s.strokeOpacity = std::stof(strokeO);
 	}
 
-	if (std::string strokeW = extractAttr(node, "stroke-width"); !strokeW.empty())
-	{
+	std::string strokeW = extractAttr(node, "stroke-width"); if (strokeW.empty() && styleMap.count("stroke-width")) strokeW = styleMap["stroke-width"];
+	if (!strokeW.empty()) {
 		s.strokeWidth = std::stof(strokeW);
 	}
 
@@ -341,20 +588,32 @@ PaintStyle SVGParser::parsePaintStyle(rapidxml::xml_node<>* node)
 PaintStyle mergePaintStyle(const PaintStyle& parent, const PaintStyle& child) {
 	PaintStyle result = child;
 
-	// Ưu tiên thuộc tính của con nếu có
+	// opacity & width kế thừa như trước
 	if (child.fillOpacity == 1.0f) result.fillOpacity *= parent.fillOpacity;
 	if (child.strokeOpacity == 1.0f) result.strokeOpacity *= parent.strokeOpacity;
-
 	if (child.strokeWidth == 1.0f) result.strokeWidth = parent.strokeWidth;
 
-	// Gộp màu (nếu màu con mặc định là đen - tức không set)
-	if (child.fillColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
-		result.fillColor = parent.fillColor;
-	if (child.strokeColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
-		result.strokeColor = parent.strokeColor;
-
+	// màu hoặc url
+	if (child.fillUrlId.empty()) {
+		if (child.fillColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
+			result.fillColor = parent.fillColor;
+		// nếu parent có url thì kế thừa
+		if (parent.fillUrlId.size() && result.fillUrlId.empty())
+			result.fillUrlId = parent.fillUrlId;
+		if (child.fillNone) result.fillUrlId.clear();
+	}
+	if (child.strokeUrlId.empty()) {
+		if (child.strokeColor.GetValue() == Gdiplus::Color(255, 0, 0, 0).GetValue())
+			result.strokeColor = parent.strokeColor;
+		if (parent.strokeUrlId.size() && result.strokeUrlId.empty())
+			result.strokeUrlId = parent.strokeUrlId;
+		if (child.strokeNone) result.strokeUrlId.clear();
+	}
+	result.fillNone = child.fillNone || parent.fillNone;
+	result.strokeNone = child.strokeNone || parent.strokeNone;
 	return result;
 }
+
 
 TextPaintStyle mergeTextStyle(const TextPaintStyle& parent, const TextPaintStyle& child) {
 	TextPaintStyle result = child;
@@ -642,6 +901,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PointF topLeft(x, y);
 
 			SVGRect* rect = new SVGRect(topLeft, width, height, s);
+			rect->setGradientRegistry(&gradientRegistry);
 
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -670,7 +930,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PaintStyle s = parsePaintStyle(node);
 
 			SVGCircle* circle = new SVGCircle(topLeft, radius, s);
-
+			circle->setGradientRegistry(&gradientRegistry);
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -700,7 +960,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PaintStyle s = parsePaintStyle(node);
 
 			SVGLine* line = new SVGLine(x1, x2, y1, y2, s);
-
+			line->setGradientRegistry(&gradientRegistry);
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -730,6 +990,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PaintStyle s = parsePaintStyle(node);
 
 			SVGEllipse* ellipse = new SVGEllipse(cx, cy, rx, ry, s);
+			ellipse->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -755,6 +1016,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PaintStyle s = parsePaintStyle(node);
 
 			SVGPolygon* polygon = new SVGPolygon(points, s);
+			polygon->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -779,6 +1041,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 			PaintStyle s = parsePaintStyle(node);
 
 			SVGPolyline* polyline = new SVGPolyline(points, s);
+			polyline->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -801,6 +1064,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 		{
 			PaintStyle style = parsePaintStyle(node);
 			SVGPath* path = new SVGPath(data, style);
+			path->setGradientRegistry(&gradientRegistry);
 
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -834,6 +1098,7 @@ SVGElement *SVGParser::createElementFromNode(rapidxml::xml_node<>* node)
 				float size = stof(sizeStr);
 
 				SVGText* text = new SVGText(content, startPoint, t, size);
+				text->setGradientRegistry(&gradientRegistry);
 
 				std::string transformStr = extractAttr(node, "transform");
 				if (!transformStr.empty()) {
@@ -881,6 +1146,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			PointF topLeft(x, y);
 
 			SVGRect* rect = new SVGRect(topLeft, width, height, finalStyle);
+			rect->setGradientRegistry(&gradientRegistry);
 
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -909,6 +1175,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			/*PaintStyle s = parsePaintStyle(node);*/
 
 			SVGCircle* circle = new SVGCircle(topLeft, radius, finalStyle);
+			circle->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -939,6 +1206,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			/*PaintStyle s = parsePaintStyle(node);*/
 
 			SVGLine* line = new SVGLine(x1, x2, y1, y2, finalStyle);
+			line->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -969,6 +1237,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			/*PaintStyle s = parsePaintStyle(node);*/
 
 			SVGEllipse* ellipse = new SVGEllipse(cx, cy, rx, ry, finalStyle);
+			ellipse->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -994,6 +1263,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			/*PaintStyle s = parsePaintStyle(node);*/
 
 			SVGPolygon* polygon = new SVGPolygon(points, finalStyle);
+			polygon->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -1018,6 +1288,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 			/*PaintStyle s = parsePaintStyle(node);*/
 
 			SVGPolyline* polyline = new SVGPolyline(points, finalStyle);
+			polyline->setGradientRegistry(&gradientRegistry);
 
 			// Áp dụng transform nếu có
 			std::string transformStr = extractAttr(node, "transform");
@@ -1040,6 +1311,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 		{
 			/*PaintStyle style = parsePaintStyle(node);*/
 			SVGPath* path = new SVGPath(data, finalStyle);
+			path->setGradientRegistry(&gradientRegistry);
 
 			std::string transformStr = extractAttr(node, "transform");
 			if (!transformStr.empty()) {
@@ -1073,6 +1345,7 @@ SVGElement* SVGParser::createElementFromNodeWithStyle(rapidxml::xml_node<>* node
 				float size = stof(sizeStr);
 
 				SVGText* text = new SVGText(content, startPoint, t, size);
+				text->setGradientRegistry(&gradientRegistry);
 
 				std::string transformStr = extractAttr(node, "transform");
 				if (!transformStr.empty()) {
@@ -1126,6 +1399,7 @@ SVGElement* SVGParser::createTextFromNodeWithStyle(rapidxml::xml_node<>* node, c
 				finalTextStyle.fontSize = fontSize; // Override with correct font size
 
 				SVGText* text = new SVGText(content, startPoint, finalTextStyle, fontSize);
+				text->setGradientRegistry(&gradientRegistry);
 
 				std::string transformStr = extractAttr(node, "transform");
 				if (!transformStr.empty()) {

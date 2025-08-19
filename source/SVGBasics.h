@@ -5,14 +5,20 @@
 using namespace Gdiplus;
 
 struct PaintStyle {
-    // Màu trực tiếp (ARGB: alpha = độ trong suốt)
-    Gdiplus::Color strokeColor = Gdiplus::Color(255, 0, 0, 0);  // black, fully opaque
-    Gdiplus::Color fillColor = Gdiplus::Color(255, 0, 0, 0);  // black, fully opaque
+    Gdiplus::Color strokeColor = Gdiplus::Color(255, 0, 0, 0);
+    Gdiplus::Color fillColor = Gdiplus::Color(255, 0, 0, 0);
 
     float strokeWidth = 1.0f;
     float strokeOpacity = 1.0f;
     float fillOpacity = 1.0f;
+
+    // NEW: hỗ trợ paint server
+    bool  fillNone = false;
+    bool  strokeNone = false;
+    std::string fillUrlId;   // "c" nếu fill="url(#c)"
+    std::string strokeUrlId; // hiện chưa dùng stroke gradient, nhưng để sẵn
 };
+
 struct TextPaintStyle {
     // Màu chữ
     Gdiplus::Color fillColor = Gdiplus::Color(255, 0, 0, 0);      // mặc định: đen, không trong suốt

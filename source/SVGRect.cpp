@@ -6,6 +6,10 @@ void SVGRect::accept(SVGVisitor* visitor){
     visitor->visit(this);
 }
 
+Gdiplus::RectF SVGRect::localBounds() const {
+    return Gdiplus::RectF(topLeft.X, topLeft.Y, width, height);
+}
+
 //Constructors
 SVGRect::SVGRect(PointF topLeft, REAL width, REAL height, const PaintStyle &s)
 {
@@ -20,54 +24,34 @@ SVGRect::SVGRect(PointF topLeft, REAL width, REAL height, const PaintStyle &s)
 }
 
 void SVGRect::draw(Graphics* graphics) const {
-    if (graphics == nullptr) return;
-
-    // Lưu trạng thái gốc của Graphics để khôi phục sau khi transform
-    GraphicsState state = graphics->Save();
-
-    // Áp dụng transform nếu có
+    if (!graphics) return;
+    auto state = graphics->Save();
     graphics->MultiplyTransform(&getTransform());
 
-    // Vẽ phần Fill (nếu có)
-    if (style.fillOpacity > 0.0f) {
-        BYTE alpha = static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA());
-        Color fillColor(
-            alpha,
-            style.fillColor.GetRed(),
-            style.fillColor.GetGreen(),
-            style.fillColor.GetBlue()
-        );
-        SolidBrush fillBrush(fillColor);
+    const RectF bb = localBounds();
 
-        graphics->FillRectangle(
-            &fillBrush,
-            static_cast<REAL>(topLeft.X),
-            static_cast<REAL>(topLeft.Y),
-            static_cast<REAL>(width),
-            static_cast<REAL>(height)
-        );
+    // FILL
+    if (!style.fillNone && style.fillOpacity > 0.0f) {
+        if (gradientRegistry && !style.fillUrlId.empty()) {
+            auto brush = gradientRegistry->makeBrush(style.fillUrlId, bb);
+            if (brush) {
+                graphics->FillRectangle(brush.get(), bb);
+            }
+        }
+        else {
+            BYTE alpha = static_cast<BYTE>(style.fillOpacity * style.fillColor.GetA());
+            Color fillColor(alpha, style.fillColor.GetR(), style.fillColor.GetG(), style.fillColor.GetB());
+            SolidBrush fillBrush(fillColor);
+            graphics->FillRectangle(&fillBrush, bb);
+        }
     }
 
-    // Vẽ phần Stroke (nếu có)
-    if (style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
+    // STROKE (giữ như cũ – có thể mở rộng url tương tự nếu cần)
+    if (!style.strokeNone && style.strokeWidth > 0.0f && style.strokeOpacity > 0.0f) {
         BYTE alpha = static_cast<BYTE>(style.strokeOpacity * style.strokeColor.GetA());
-        Color strokeColor(
-            alpha,
-            style.strokeColor.GetRed(),
-            style.strokeColor.GetGreen(),
-            style.strokeColor.GetBlue()
-        );
+        Color strokeColor(alpha, style.strokeColor.GetR(), style.strokeColor.GetG(), style.strokeColor.GetB());
         Pen pen(strokeColor, static_cast<REAL>(style.strokeWidth));
-
-        graphics->DrawRectangle(
-            &pen,
-            static_cast<REAL>(topLeft.X),
-            static_cast<REAL>(topLeft.Y),
-            static_cast<REAL>(width),
-            static_cast<REAL>(height)
-        );
+        graphics->DrawRectangle(&pen, bb);
     }
-
-    // Khôi phục lại trạng thái ban đầu để các element khác không bị ảnh hưởng
     graphics->Restore(state);
 }

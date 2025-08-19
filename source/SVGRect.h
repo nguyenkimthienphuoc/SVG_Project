@@ -18,4 +18,6 @@ public:
 	void setTopLeft(PointF newTopLeft) { topLeft = newTopLeft; }
 	void setWidth(REAL newWidth) { width = newWidth; }
 	void setHeight(REAL newHeight) { height = newHeight; }
+
+	Gdiplus::RectF localBounds() const override;
 };

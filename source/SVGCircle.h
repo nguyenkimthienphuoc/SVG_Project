@@ -19,4 +19,6 @@ public:
    float getRadius() const { return radius; }
    void setCenter(PointF newCenter) { center = newCenter; }
    void setRadius(float newRadius) { radius = newRadius; }
+
+   Gdiplus::RectF localBounds() const override;
 };

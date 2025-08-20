@@ -5,7 +5,7 @@
 using namespace Gdiplus;
 
 struct PaintStyle {
-    Gdiplus::Color strokeColor = Gdiplus::Color(255, 0, 0, 0);
+    Gdiplus::Color strokeColor = Gdiplus::Color(0, 0, 0, 0);
     Gdiplus::Color fillColor = Gdiplus::Color(255, 0, 0, 0);
 
     float strokeWidth = 1.0f;
